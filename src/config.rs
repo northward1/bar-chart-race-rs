@@ -67,6 +67,19 @@ pub struct ChartConfig {
     pub log_scale: bool,
     pub log_min: f64,
     pub number_format: NumberFormat,
+    pub axis_number_format: Option<NumberFormat>,
+    pub bar_number_format: Option<NumberFormat>,
+    pub hide_bar_labels: bool,
+}
+
+impl ChartConfig {
+    pub fn effective_axis_format(&self) -> NumberFormat {
+        self.axis_number_format.unwrap_or(self.number_format)
+    }
+
+    pub fn effective_bar_format(&self) -> NumberFormat {
+        self.bar_number_format.unwrap_or(self.number_format)
+    }
 }
 
 impl Default for ChartConfig {
@@ -88,6 +101,9 @@ impl Default for ChartConfig {
             log_scale: false,
             log_min: 1.0,
             number_format: NumberFormat::default(),
+            axis_number_format: None,
+            bar_number_format: None,
+            hide_bar_labels: false,
         }
     }
 }

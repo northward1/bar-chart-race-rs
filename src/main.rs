@@ -80,6 +80,18 @@ struct Args {
     /// Number format for values and axis ticks: 'auto', 'integer', 'compact', 'scientific', 'exp', 'fixed1', 'fixed2'
     #[arg(long, value_enum, default_value_t = NumberFormat::Auto)]
     number_format: NumberFormat,
+
+    /// Override number format specifically for axis ticks
+    #[arg(long, value_enum)]
+    axis_number_format: Option<NumberFormat>,
+
+    /// Override number format specifically for bar value labels
+    #[arg(long, value_enum)]
+    bar_number_format: Option<NumberFormat>,
+
+    /// Hide labels (values/names) attached to the bars
+    #[arg(long)]
+    hide_bar_labels: bool,
 }
 
 fn main() -> Result<()> {
@@ -117,6 +129,9 @@ fn main() -> Result<()> {
         log_scale: args.log_scale,
         log_min: args.log_min,
         number_format: args.number_format,
+        axis_number_format: args.axis_number_format,
+        bar_number_format: args.bar_number_format,
+        hide_bar_labels: args.hide_bar_labels,
     };
 
     println!(

@@ -218,9 +218,10 @@ impl Renderer {
                     mesh.x_desc(x_label);
                 }
 
-                let num_format = self.config.number_format;
-                let formatter = move |v: &f64| format_number(*v, num_format);
-                if num_format != NumberFormat::Auto {
+                let axis_fmt = self.config.effective_axis_format();
+                let bar_fmt = self.config.effective_bar_format();
+                let formatter = move |v: &f64| format_number(*v, axis_fmt);
+                if axis_fmt != NumberFormat::Auto {
                     mesh.x_label_formatter(&formatter);
                 }
 
@@ -266,7 +267,7 @@ impl Renderer {
                         color,
                     )))?;
 
-                    let val_str = format_number(bar.value, num_format);
+                    let val_str = format_number(bar.value, bar_fmt);
 
                     match self.config.label_position {
                         LabelPosition::YAxis => {
@@ -276,19 +277,23 @@ impl Renderer {
                                 root.draw_text(&bar.name, &y_axis_name_style, (px - 8, py))?;
                             }
 
-                            $chart.draw_series(std::iter::once(Text::new(
-                                format!("  {}", val_str),
-                                (bar_len, y + 0.5),
-                                val_text_style.clone(),
-                            )))?;
+                            if !self.config.hide_bar_labels {
+                                $chart.draw_series(std::iter::once(Text::new(
+                                    format!("  {}", val_str),
+                                    (bar_len, y + 0.5),
+                                    val_text_style.clone(),
+                                )))?;
+                            }
                         }
                         LabelPosition::BarTip => {
-                            let label = format!("  {} ({})", bar.name, val_str);
-                            $chart.draw_series(std::iter::once(Text::new(
-                                label,
-                                (bar_len, y + 0.5),
-                                val_text_style.clone(),
-                            )))?;
+                            if !self.config.hide_bar_labels {
+                                let label = format!("  {} ({})", bar.name, val_str);
+                                $chart.draw_series(std::iter::once(Text::new(
+                                    label,
+                                    (bar_len, y + 0.5),
+                                    val_text_style.clone(),
+                                )))?;
+                            }
                         }
                     }
                 }
@@ -354,9 +359,10 @@ impl Renderer {
                     mesh.x_desc(x_label);
                 }
 
-                let num_format = self.config.number_format;
-                let formatter = move |v: &f64| format_number(*v, num_format);
-                if num_format != NumberFormat::Auto {
+                let axis_fmt = self.config.effective_axis_format();
+                let bar_fmt = self.config.effective_bar_format();
+                let formatter = move |v: &f64| format_number(*v, axis_fmt);
+                if axis_fmt != NumberFormat::Auto {
                     mesh.y_label_formatter(&formatter);
                 }
 
@@ -398,7 +404,7 @@ impl Renderer {
                         color,
                     )))?;
 
-                    let val_str = format_number(bar.value, num_format);
+                    let val_str = format_number(bar.value, bar_fmt);
 
                     let (px, py) = $chart
                         .plotting_area()
@@ -411,12 +417,12 @@ impl Renderer {
                             if base_px >= left_px - 10 && base_px <= right_px + 10 {
                                 root.draw_text(&bar.name, &name_style, (base_px, base_py + 6))?;
                             }
-                            if py >= top_py - 10 && py <= bottom_py + 10 {
+                            if !self.config.hide_bar_labels && py >= top_py - 10 && py <= bottom_py + 10 {
                                 root.draw_text(&val_str, &val_style, (px, py - 4))?;
                             }
                         }
                         LabelPosition::BarTip => {
-                            if py >= top_py - 10 && py <= bottom_py + 10 {
+                            if !self.config.hide_bar_labels && py >= top_py - 10 && py <= bottom_py + 10 {
                                 let label = format!("{} ({})", bar.name, val_str);
                                 root.draw_text(&label, &val_style, (px, py - 4))?;
                             }

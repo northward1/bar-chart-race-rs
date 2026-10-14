@@ -225,3 +225,68 @@ fn test_number_formats() {
         assert!(metadata.len() > 0);
     }
 }
+
+#[test]
+fn test_hide_bar_labels() {
+    use bar_chart_race::Orientation;
+
+    let data =
+        TimeSeriesData::from_csv("examples/data/cities.csv").expect("CSV loading should succeed");
+
+    for orientation in [Orientation::Horizontal, Orientation::Vertical] {
+        let config = ChartConfig {
+            width: 400,
+            height: 300,
+            fps: 10,
+            steps_per_period: 2,
+            top_n: 3,
+            orientation,
+            hide_bar_labels: true,
+            ..Default::default()
+        };
+
+        let frames = Interpolator::generate_frames_from_config(&data, &config);
+        let tmp_file = NamedTempFile::new().expect("Create temp file");
+        let renderer = Renderer::new(config);
+        renderer
+            .render_gif(&frames, tmp_file.path())
+            .expect("Rendering should succeed");
+
+        let metadata = std::fs::metadata(tmp_file.path()).expect("File metadata");
+        assert!(metadata.len() > 0);
+    }
+}
+
+#[test]
+fn test_axis_and_bar_number_formats() {
+    use bar_chart_race::NumberFormat;
+
+    let data =
+        TimeSeriesData::from_csv("examples/data/cities.csv").expect("CSV loading should succeed");
+
+    let config = ChartConfig {
+        width: 400,
+        height: 300,
+        fps: 10,
+        steps_per_period: 2,
+        top_n: 3,
+        number_format: NumberFormat::Compact,
+        axis_number_format: Some(NumberFormat::Exp),
+        bar_number_format: Some(NumberFormat::Fixed2),
+        ..Default::default()
+    };
+
+    assert_eq!(config.effective_axis_format(), NumberFormat::Exp);
+    assert_eq!(config.effective_bar_format(), NumberFormat::Fixed2);
+
+    let frames = Interpolator::generate_frames_from_config(&data, &config);
+    let tmp_file = NamedTempFile::new().expect("Create temp file");
+    let renderer = Renderer::new(config);
+    renderer
+        .render_gif(&frames, tmp_file.path())
+        .expect("Rendering should succeed");
+
+    let metadata = std::fs::metadata(tmp_file.path()).expect("File metadata");
+    assert!(metadata.len() > 0);
+}
+
