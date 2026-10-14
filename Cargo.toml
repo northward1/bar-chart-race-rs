@@ -1,6 +1,6 @@
 [package]
 name = "bar-chart-race"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 description = "A fast and customizable Bar Chart Race generator in Rust using Plotters"
 license = "MIT"

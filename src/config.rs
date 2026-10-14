@@ -1,3 +1,17 @@
+use clap::ValueEnum;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize, Deserialize, Default)]
+pub enum LabelPosition {
+    /// Draw category name beside the Y-axis (left of bar) and value at the bar tip
+    #[default]
+    #[value(name = "y-axis")]
+    YAxis,
+    /// Draw category name and value together at the bar tip
+    #[value(name = "bar-tip")]
+    BarTip,
+}
+
 #[derive(Debug, Clone)]
 pub struct ChartConfig {
     pub width: u32,
@@ -11,6 +25,7 @@ pub struct ChartConfig {
     pub max_x: Option<f64>,
     pub clamp_exit: bool,
     pub ascending: bool,
+    pub label_position: LabelPosition,
 }
 
 impl Default for ChartConfig {
@@ -27,6 +42,7 @@ impl Default for ChartConfig {
             max_x: None,
             clamp_exit: false,
             ascending: false,
+            label_position: LabelPosition::default(),
         }
     }
 }

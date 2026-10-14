@@ -48,6 +48,7 @@ fn test_ascending_order_and_custom_options() {
         max_x: Some(50.0),
         clamp_exit: false,
         ascending: true,
+        ..Default::default()
     };
 
     let frames = Interpolator::generate_frames_from_config(&data, &config);
@@ -67,4 +68,34 @@ fn test_ascending_order_and_custom_options() {
 
     let metadata = std::fs::metadata(tmp_file.path()).expect("File metadata");
     assert!(metadata.len() > 0);
+}
+
+#[test]
+fn test_label_positions() {
+    use bar_chart_race::LabelPosition;
+
+    let data =
+        TimeSeriesData::from_csv("examples/data/cities.csv").expect("CSV loading should succeed");
+
+    for position in [LabelPosition::YAxis, LabelPosition::BarTip] {
+        let config = ChartConfig {
+            width: 400,
+            height: 300,
+            fps: 10,
+            steps_per_period: 2,
+            top_n: 3,
+            label_position: position,
+            ..Default::default()
+        };
+
+        let frames = Interpolator::generate_frames_from_config(&data, &config);
+        let tmp_file = NamedTempFile::new().expect("Create temp file");
+        let renderer = Renderer::new(config);
+        renderer
+            .render_gif(&frames, tmp_file.path())
+            .expect("Rendering should succeed");
+
+        let metadata = std::fs::metadata(tmp_file.path()).expect("File metadata");
+        assert!(metadata.len() > 0);
+    }
 }

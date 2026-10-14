@@ -7,7 +7,7 @@ use std::fs::File;
 use std::path::Path;
 use std::time::Duration;
 
-use crate::config::ChartConfig;
+use crate::config::{ChartConfig, LabelPosition};
 use crate::interpolation::Frame;
 
 pub struct Renderer {
@@ -29,6 +29,31 @@ impl Renderer {
         let width = self.config.width;
         let height = self.config.height;
 
+        let name_font = ("sans-serif", 15).into_font();
+        let (margin_left, y_label_area_size) = match self.config.label_position {
+            LabelPosition::YAxis => {
+                let max_name_width = frames
+                    .iter()
+                    .flat_map(|f| &f.bars)
+                    .filter(|b| b.rank < self.config.top_n as f64)
+                    .map(|b| name_font.box_size(&b.name).map(|(w, _)| w).unwrap_or(0))
+                    .max()
+                    .unwrap_or(0);
+                let y_desc_space = if self.config.y_label.is_some() { 30 } else { 0 };
+                // Keep 8px padding between the category text and the Y-axis (x=0)
+                let area_size = max_name_width + 8 + y_desc_space;
+                (15, area_size)
+            }
+            LabelPosition::BarTip => {
+                let area_size = if self.config.y_label.is_some() {
+                    40
+                } else {
+                    15
+                };
+                (20, area_size)
+            }
+        };
+
         for frame in frames {
             let mut buf = vec![0u8; (width * height * 3) as usize];
 
@@ -41,13 +66,10 @@ impl Renderer {
 
                 let mut chart = ChartBuilder::on(&root)
                     .caption(&self.config.title, ("sans-serif", 32).into_font())
-                    .margin(30)
+                    .margin(25)
+                    .margin_left(margin_left)
                     .x_label_area_size(40)
-                    .y_label_area_size(if self.config.y_label.is_some() {
-                        60
-                    } else {
-                        40
-                    })
+                    .y_label_area_size(y_label_area_size)
                     .build_cartesian_2d(0.0..x_max, 0.0..self.config.top_n as f64)?;
 
                 let mut mesh = chart.configure_mesh();
@@ -73,6 +95,15 @@ impl Renderer {
                     (width as i32 - 50, height as i32 - 65),
                 )?;
 
+                let (_, top_py) = chart
+                    .plotting_area()
+                    .map_coordinate(&(0.0, self.config.top_n as f64));
+                let (_, bottom_py) = chart.plotting_area().map_coordinate(&(0.0, 0.0));
+
+                let y_axis_name_style = TextStyle::from(("sans-serif", 15).into_font())
+                    .color(&BLACK)
+                    .pos(Pos::new(HPos::Right, VPos::Center));
+
                 // Render bars smoothly based on continuous rank
                 for bar in &frame.bars {
                     // Continuous Y position: rank 0 -> top_n - 1.0, rank (top_n - 1) -> 0.0
@@ -92,20 +123,44 @@ impl Renderer {
                         color,
                     )))?;
 
-                    // Draw label: Name and value on/beside the bar
-                    let label = if bar.value >= 1_000.0 {
-                        format!("  {} ({:.0})", bar.name, bar.value)
-                    } else if bar.value >= 10.0 {
-                        format!("  {} ({:.1})", bar.name, bar.value)
-                    } else {
-                        format!("  {} ({:.2})", bar.name, bar.value)
-                    };
+                    match self.config.label_position {
+                        LabelPosition::YAxis => {
+                            let (px, py) = chart.plotting_area().map_coordinate(&(0.0, y + 0.5));
+                            // Only draw category name beside Y-axis if within visible vertical plot bounds
+                            if py >= top_py - 5 && py <= bottom_py + 5 {
+                                root.draw_text(&bar.name, &y_axis_name_style, (px - 8, py))?;
+                            }
 
-                    chart.draw_series(std::iter::once(Text::new(
-                        label,
-                        (bar_len, y + 0.5),
-                        ("sans-serif", 15).into_font().color(&BLACK),
-                    )))?;
+                            let val_str = if bar.value >= 1_000.0 {
+                                format!("  {:.0}", bar.value)
+                            } else if bar.value >= 10.0 {
+                                format!("  {:.1}", bar.value)
+                            } else {
+                                format!("  {:.2}", bar.value)
+                            };
+
+                            chart.draw_series(std::iter::once(Text::new(
+                                val_str,
+                                (bar_len, y + 0.5),
+                                ("sans-serif", 15).into_font().color(&BLACK),
+                            )))?;
+                        }
+                        LabelPosition::BarTip => {
+                            let label = if bar.value >= 1_000.0 {
+                                format!("  {} ({:.0})", bar.name, bar.value)
+                            } else if bar.value >= 10.0 {
+                                format!("  {} ({:.1})", bar.name, bar.value)
+                            } else {
+                                format!("  {} ({:.2})", bar.name, bar.value)
+                            };
+
+                            chart.draw_series(std::iter::once(Text::new(
+                                label,
+                                (bar_len, y + 0.5),
+                                ("sans-serif", 15).into_font().color(&BLACK),
+                            )))?;
+                        }
+                    }
                 }
 
                 root.present()?;

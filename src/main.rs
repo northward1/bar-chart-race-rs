@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use std::path::PathBuf;
 
-use bar_chart_race::{ChartConfig, Interpolator, Renderer, TimeSeriesData};
+use bar_chart_race::{ChartConfig, Interpolator, LabelPosition, Renderer, TimeSeriesData};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about = "Generate Bar Chart Race animations in Rust", long_about = None)]
@@ -58,6 +58,10 @@ struct Args {
     /// Sort in ascending order (smaller values at the top)
     #[arg(long)]
     ascending: bool,
+
+    /// Position of bar labels: 'y-axis' (beside Y axis) or 'bar-tip' (at the tip of each bar)
+    #[arg(long, value_enum, default_value_t = LabelPosition::YAxis)]
+    label_position: LabelPosition,
 }
 
 fn main() -> Result<()> {
@@ -78,6 +82,7 @@ fn main() -> Result<()> {
         max_x: args.max_x,
         clamp_exit: args.clamp_exit,
         ascending: args.ascending,
+        label_position: args.label_position,
     };
 
     println!(
