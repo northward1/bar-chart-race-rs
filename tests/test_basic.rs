@@ -161,3 +161,30 @@ fn test_log_scale() {
         assert!(metadata.len() > 0);
     }
 }
+
+#[test]
+fn test_auto_clamp_top_n() {
+    let data =
+        TimeSeriesData::from_csv("examples/data/cities.csv").expect("CSV loading should succeed");
+    assert_eq!(data.categories.len(), 5);
+
+    // Request top_n = 20, should clamp to 5 categories
+    let config = ChartConfig {
+        width: 400,
+        height: 300,
+        fps: 10,
+        steps_per_period: 2,
+        top_n: 20,
+        ..Default::default()
+    };
+
+    let frames = Interpolator::generate_frames_from_config(&data, &config);
+    assert!(!frames.is_empty());
+    // Max bars in any frame should not exceed data.categories.len() (5)
+    for frame in &frames {
+        assert!(frame.bars.len() <= 5);
+        for bar in &frame.bars {
+            assert!(bar.rank < 5.0);
+        }
+    }
+}

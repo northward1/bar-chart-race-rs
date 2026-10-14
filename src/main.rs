@@ -84,12 +84,24 @@ fn main() -> Result<()> {
     println!("Loading data from {:?}...", args.input);
     let data = TimeSeriesData::from_csv(&args.input)?;
 
+    let effective_top_n = if args.top_n > data.categories.len() {
+        println!(
+            "Dataset has {} categories; automatically adjusting top_n from {} to {}.",
+            data.categories.len(),
+            args.top_n,
+            data.categories.len()
+        );
+        data.categories.len()
+    } else {
+        args.top_n
+    };
+
     let config = ChartConfig {
         width: args.width,
         height: args.height,
         fps: args.fps,
         steps_per_period: args.steps,
-        top_n: args.top_n,
+        top_n: effective_top_n,
         title: args.title,
         x_label: args.x_label,
         y_label: args.y_label,
@@ -105,7 +117,7 @@ fn main() -> Result<()> {
     println!(
         "Interpolating frames (steps: {}, top: {}, order: {})...",
         args.steps,
-        args.top_n,
+        config.top_n,
         if config.ascending {
             "ascending"
         } else {
