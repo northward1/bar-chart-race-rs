@@ -19,7 +19,11 @@ pub struct Frame {
 pub struct Interpolator;
 
 impl Interpolator {
-    pub fn generate_frames(data: &TimeSeriesData, steps_per_period: usize, top_n: usize) -> Vec<Frame> {
+    pub fn generate_frames(
+        data: &TimeSeriesData,
+        steps_per_period: usize,
+        top_n: usize,
+    ) -> Vec<Frame> {
         let n_periods = data.periods.len();
         if n_periods == 0 {
             return Vec::new();
@@ -40,7 +44,12 @@ impl Interpolator {
                 .categories
                 .iter()
                 .map(|cat| {
-                    let val = data.values.get(cat).and_then(|v| v.get(p)).copied().unwrap_or(0.0);
+                    let val = data
+                        .values
+                        .get(cat)
+                        .and_then(|v| v.get(p))
+                        .copied()
+                        .unwrap_or(0.0);
                     (cat, val)
                 })
                 .collect();
@@ -56,7 +65,11 @@ impl Interpolator {
 
         for i in 0..n_periods {
             let next_i = (i + 1).min(n_periods - 1);
-            let steps = if i == n_periods - 1 { 1 } else { steps_per_period };
+            let steps = if i == n_periods - 1 {
+                1
+            } else {
+                steps_per_period
+            };
 
             let ranks_0 = &period_ranks[i];
             let ranks_1 = &period_ranks[next_i];
@@ -79,8 +92,18 @@ impl Interpolator {
                 let mut max_value: f64 = 1.0;
 
                 for cat in &data.categories {
-                    let v0 = data.values.get(cat).and_then(|v| v.get(i)).copied().unwrap_or(0.0);
-                    let v1 = data.values.get(cat).and_then(|v| v.get(next_i)).copied().unwrap_or(v0);
+                    let v0 = data
+                        .values
+                        .get(cat)
+                        .and_then(|v| v.get(i))
+                        .copied()
+                        .unwrap_or(0.0);
+                    let v1 = data
+                        .values
+                        .get(cat)
+                        .and_then(|v| v.get(next_i))
+                        .copied()
+                        .unwrap_or(v0);
                     let val = v0 + (v1 - v0) * t;
 
                     let r0 = ranks_0.get(cat).copied().unwrap_or(top_n) as f64;
@@ -111,7 +134,11 @@ impl Interpolator {
                 }
 
                 // Sort bars so they are ordered by rank
-                frame_bars.sort_by(|a, b| a.rank.partial_cmp(&b.rank).unwrap_or(std::cmp::Ordering::Equal));
+                frame_bars.sort_by(|a, b| {
+                    a.rank
+                        .partial_cmp(&b.rank)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
 
                 frames.push(Frame {
                     period_label: data.periods[i].clone(),

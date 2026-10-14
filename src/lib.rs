@@ -7,4 +7,3 @@ pub use config::ChartConfig;
 pub use data::TimeSeriesData;
 pub use interpolation::{Frame, Interpolator};
 pub use renderer::Renderer;
-

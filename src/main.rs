@@ -55,7 +55,10 @@ fn main() -> Result<()> {
         title: args.title,
     };
 
-    println!("Interpolating frames (steps: {}, top: {})...", args.steps, args.top_n);
+    println!(
+        "Interpolating frames (steps: {}, top: {})...",
+        args.steps, args.top_n
+    );
     let frames = Interpolator::generate_frames(&data, config.steps_per_period, config.top_n);
     println!("Total frames generated: {}", frames.len());
 
@@ -66,4 +69,3 @@ fn main() -> Result<()> {
     println!("Done! Saved to {:?}", args.output);
     Ok(())
 }
-
