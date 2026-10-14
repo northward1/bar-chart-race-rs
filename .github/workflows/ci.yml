@@ -21,6 +21,12 @@ jobs:
         with:
           components: clippy, rustfmt
 
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfontconfig1-dev pkg-config
+
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
