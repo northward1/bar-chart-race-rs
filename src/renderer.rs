@@ -33,7 +33,8 @@ impl Renderer {
             let mut buf = vec![0u8; (width * height * 3) as usize];
 
             {
-                let root = BitMapBackend::with_buffer(&mut buf, (width, height)).into_drawing_area();
+                let root =
+                    BitMapBackend::with_buffer(&mut buf, (width, height)).into_drawing_area();
                 root.fill(&WHITE)?;
 
                 let mut chart = ChartBuilder::on(&root)

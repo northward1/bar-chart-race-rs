@@ -3,7 +3,8 @@ use tempfile::NamedTempFile;
 
 #[test]
 fn test_interpolation_and_rendering() {
-    let data = TimeSeriesData::from_csv("examples/data/cities.csv").expect("CSV loading should succeed");
+    let data =
+        TimeSeriesData::from_csv("examples/data/cities.csv").expect("CSV loading should succeed");
     assert_eq!(data.periods.len(), 5);
     assert_eq!(data.categories.len(), 5);
 
@@ -21,7 +22,9 @@ fn test_interpolation_and_rendering() {
 
     let tmp_file = NamedTempFile::new().expect("Create temp file");
     let renderer = Renderer::new(config);
-    renderer.render_gif(&frames, tmp_file.path()).expect("Rendering should succeed");
+    renderer
+        .render_gif(&frames, tmp_file.path())
+        .expect("Rendering should succeed");
 
     let metadata = std::fs::metadata(tmp_file.path()).expect("File metadata");
     assert!(metadata.len() > 0);

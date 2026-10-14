@@ -25,4 +25,3 @@ fn main() -> Result<()> {
     println!("Saved GIF to {}", output_path);
     Ok(())
 }
-
