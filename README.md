@@ -72,6 +72,7 @@ bar-chart-race \
 - `--ascending`: Sort in ascending order (smallest values at the top)
 - `--clamp-exit`: Clamp exit/entry animations to the bottom edge instead of following actual rank trajectory
 - `--label-position <y-axis|bar-tip>`: Position of bar labels: `y-axis` (beside Y axis with values at bar tips, default) or `bar-tip` (category name and value together at bar tips)
+- `--orientation <horizontal|vertical>`: Orientation of bars: `horizontal` (default) or `vertical` (bars grow upward, ranks left-to-right)
 
 ## Sample Datasets
 
