@@ -289,4 +289,3 @@ fn test_axis_and_bar_number_formats() {
     let metadata = std::fs::metadata(tmp_file.path()).expect("File metadata");
     assert!(metadata.len() > 0);
 }
-

@@ -417,12 +417,18 @@ impl Renderer {
                             if base_px >= left_px - 10 && base_px <= right_px + 10 {
                                 root.draw_text(&bar.name, &name_style, (base_px, base_py + 6))?;
                             }
-                            if !self.config.hide_bar_labels && py >= top_py - 10 && py <= bottom_py + 10 {
+                            if !self.config.hide_bar_labels
+                                && py >= top_py - 10
+                                && py <= bottom_py + 10
+                            {
                                 root.draw_text(&val_str, &val_style, (px, py - 4))?;
                             }
                         }
                         LabelPosition::BarTip => {
-                            if !self.config.hide_bar_labels && py >= top_py - 10 && py <= bottom_py + 10 {
+                            if !self.config.hide_bar_labels
+                                && py >= top_py - 10
+                                && py <= bottom_py + 10
+                            {
                                 let label = format!("{} ({})", bar.name, val_str);
                                 root.draw_text(&label, &val_style, (px, py - 4))?;
                             }
