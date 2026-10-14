@@ -42,15 +42,7 @@ impl Interpolator {
         }
 
         let steps_per_period = config.steps_per_period;
-        let top_n = config.top_n;
-
-        // Persistent category color mapping
-        let color_map: HashMap<String, usize> = data
-            .categories
-            .iter()
-            .enumerate()
-            .map(|(idx, cat)| (cat.clone(), idx))
-            .collect();
+        let top_n = config.top_n.min(data.categories.len());
 
         // Calculate discrete ranking for each category at each period
         let mut period_ranks: Vec<HashMap<String, usize>> = Vec::with_capacity(n_periods);
@@ -80,6 +72,31 @@ impl Interpolator {
                 ranks.insert((*cat).clone(), rank);
             }
             period_ranks.push(ranks);
+        }
+
+        // Persistent category color mapping:
+        // Prioritize categories that actually appear in top_n across periods
+        let mut visible_order: Vec<String> = Vec::new();
+        for ranks in &period_ranks {
+            let mut sorted_period: Vec<(&String, &usize)> = ranks.iter().collect();
+            sorted_period.sort_by_key(|&(_, r)| *r);
+            for (cat, &r) in sorted_period {
+                if r < top_n && !visible_order.contains(cat) {
+                    visible_order.push((*cat).clone());
+                }
+            }
+        }
+
+        let mut color_map: HashMap<String, usize> = HashMap::new();
+        for (idx, cat) in visible_order.iter().enumerate() {
+            color_map.insert(cat.clone(), idx);
+        }
+        let mut next_idx = visible_order.len();
+        for cat in &data.categories {
+            if !color_map.contains_key(cat) {
+                color_map.insert(cat.clone(), next_idx);
+                next_idx += 1;
+            }
         }
 
         let mut frames = Vec::new();

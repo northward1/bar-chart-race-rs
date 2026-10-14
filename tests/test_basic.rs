@@ -48,6 +48,7 @@ fn test_ascending_order_and_custom_options() {
         max_x: Some(50.0),
         clamp_exit: false,
         ascending: true,
+        ..Default::default()
     };
 
     let frames = Interpolator::generate_frames_from_config(&data, &config);
@@ -59,6 +60,226 @@ fn test_ascending_order_and_custom_options() {
     assert!(first_frame.bars[0].rank < first_frame.bars[1].rank);
     assert!(first_frame.bars[0].value <= first_frame.bars[1].value);
 
+    let tmp_file = NamedTempFile::new().expect("Create temp file");
+    let renderer = Renderer::new(config);
+    renderer
+        .render_gif(&frames, tmp_file.path())
+        .expect("Rendering should succeed");
+
+    let metadata = std::fs::metadata(tmp_file.path()).expect("File metadata");
+    assert!(metadata.len() > 0);
+}
+
+#[test]
+fn test_label_positions() {
+    use bar_chart_race::LabelPosition;
+
+    let data =
+        TimeSeriesData::from_csv("examples/data/cities.csv").expect("CSV loading should succeed");
+
+    for position in [LabelPosition::YAxis, LabelPosition::BarTip] {
+        let config = ChartConfig {
+            width: 400,
+            height: 300,
+            fps: 10,
+            steps_per_period: 2,
+            top_n: 3,
+            label_position: position,
+            ..Default::default()
+        };
+
+        let frames = Interpolator::generate_frames_from_config(&data, &config);
+        let tmp_file = NamedTempFile::new().expect("Create temp file");
+        let renderer = Renderer::new(config);
+        renderer
+            .render_gif(&frames, tmp_file.path())
+            .expect("Rendering should succeed");
+
+        let metadata = std::fs::metadata(tmp_file.path()).expect("File metadata");
+        assert!(metadata.len() > 0);
+    }
+}
+
+#[test]
+fn test_orientations() {
+    use bar_chart_race::Orientation;
+
+    let data =
+        TimeSeriesData::from_csv("examples/data/cities.csv").expect("CSV loading should succeed");
+
+    for orientation in [Orientation::Horizontal, Orientation::Vertical] {
+        let config = ChartConfig {
+            width: 400,
+            height: 300,
+            fps: 10,
+            steps_per_period: 2,
+            top_n: 3,
+            orientation,
+            ..Default::default()
+        };
+
+        let frames = Interpolator::generate_frames_from_config(&data, &config);
+        let tmp_file = NamedTempFile::new().expect("Create temp file");
+        let renderer = Renderer::new(config);
+        renderer
+            .render_gif(&frames, tmp_file.path())
+            .expect("Rendering should succeed");
+
+        let metadata = std::fs::metadata(tmp_file.path()).expect("File metadata");
+        assert!(metadata.len() > 0);
+    }
+}
+
+#[test]
+fn test_log_scale() {
+    use bar_chart_race::Orientation;
+
+    let data =
+        TimeSeriesData::from_csv("examples/data/cities.csv").expect("CSV loading should succeed");
+
+    for orientation in [Orientation::Horizontal, Orientation::Vertical] {
+        let config = ChartConfig {
+            width: 400,
+            height: 300,
+            fps: 10,
+            steps_per_period: 2,
+            top_n: 3,
+            orientation,
+            log_scale: true,
+            log_min: 0.5,
+            ..Default::default()
+        };
+
+        let frames = Interpolator::generate_frames_from_config(&data, &config);
+        let tmp_file = NamedTempFile::new().expect("Create temp file");
+        let renderer = Renderer::new(config);
+        renderer
+            .render_gif(&frames, tmp_file.path())
+            .expect("Rendering should succeed");
+
+        let metadata = std::fs::metadata(tmp_file.path()).expect("File metadata");
+        assert!(metadata.len() > 0);
+    }
+}
+
+#[test]
+fn test_auto_clamp_top_n() {
+    let data =
+        TimeSeriesData::from_csv("examples/data/cities.csv").expect("CSV loading should succeed");
+    assert_eq!(data.categories.len(), 5);
+
+    // Request top_n = 20, should clamp to 5 categories
+    let config = ChartConfig {
+        width: 400,
+        height: 300,
+        fps: 10,
+        steps_per_period: 2,
+        top_n: 20,
+        ..Default::default()
+    };
+
+    let frames = Interpolator::generate_frames_from_config(&data, &config);
+    assert!(!frames.is_empty());
+    // Max bars in any frame should not exceed data.categories.len() (5)
+    for frame in &frames {
+        assert!(frame.bars.len() <= 5);
+        for bar in &frame.bars {
+            assert!(bar.rank < 5.0);
+        }
+    }
+}
+
+#[test]
+fn test_number_formats() {
+    use bar_chart_race::NumberFormat;
+
+    let data =
+        TimeSeriesData::from_csv("examples/data/cities.csv").expect("CSV loading should succeed");
+
+    for fmt in [
+        NumberFormat::Integer,
+        NumberFormat::Compact,
+        NumberFormat::Scientific,
+        NumberFormat::Exp,
+        NumberFormat::Fixed1,
+        NumberFormat::Fixed2,
+    ] {
+        let config = ChartConfig {
+            width: 400,
+            height: 300,
+            fps: 10,
+            steps_per_period: 2,
+            top_n: 3,
+            number_format: fmt,
+            ..Default::default()
+        };
+
+        let frames = Interpolator::generate_frames_from_config(&data, &config);
+        let tmp_file = NamedTempFile::new().expect("Create temp file");
+        let renderer = Renderer::new(config);
+        renderer
+            .render_gif(&frames, tmp_file.path())
+            .expect("Rendering should succeed");
+
+        let metadata = std::fs::metadata(tmp_file.path()).expect("File metadata");
+        assert!(metadata.len() > 0);
+    }
+}
+
+#[test]
+fn test_hide_bar_labels() {
+    use bar_chart_race::Orientation;
+
+    let data =
+        TimeSeriesData::from_csv("examples/data/cities.csv").expect("CSV loading should succeed");
+
+    for orientation in [Orientation::Horizontal, Orientation::Vertical] {
+        let config = ChartConfig {
+            width: 400,
+            height: 300,
+            fps: 10,
+            steps_per_period: 2,
+            top_n: 3,
+            orientation,
+            hide_bar_labels: true,
+            ..Default::default()
+        };
+
+        let frames = Interpolator::generate_frames_from_config(&data, &config);
+        let tmp_file = NamedTempFile::new().expect("Create temp file");
+        let renderer = Renderer::new(config);
+        renderer
+            .render_gif(&frames, tmp_file.path())
+            .expect("Rendering should succeed");
+
+        let metadata = std::fs::metadata(tmp_file.path()).expect("File metadata");
+        assert!(metadata.len() > 0);
+    }
+}
+
+#[test]
+fn test_axis_and_bar_number_formats() {
+    use bar_chart_race::NumberFormat;
+
+    let data =
+        TimeSeriesData::from_csv("examples/data/cities.csv").expect("CSV loading should succeed");
+
+    let config = ChartConfig {
+        width: 400,
+        height: 300,
+        fps: 10,
+        steps_per_period: 2,
+        top_n: 3,
+        number_format: NumberFormat::Compact,
+        axis_number_format: Some(NumberFormat::Exp),
+        bar_number_format: Some(NumberFormat::Fixed2),
+        ..Default::default()
+    };
+
+    assert_eq!(config.effective_axis_format(), NumberFormat::Exp);
+    assert_eq!(config.effective_bar_format(), NumberFormat::Fixed2);
+
+    let frames = Interpolator::generate_frames_from_config(&data, &config);
     let tmp_file = NamedTempFile::new().expect("Create temp file");
     let renderer = Renderer::new(config);
     renderer

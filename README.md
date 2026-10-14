@@ -33,27 +33,24 @@ cargo build --release
 ## CLI Usage
 
 ```bash
+# Example with Tech Giants Market Cap dataset:
+bar-chart-race \
+  --input examples/data/tech_market_cap.csv \
+  --title "Top Global Companies by Market Cap (\$B)" \
+  --x-label "Market Cap (\$B)"
+
 # Example with World Urban Population dataset:
 bar-chart-race \
   --input examples/data/urban_pop.csv \
   --output race_urban.gif \
   --title "World Urban Population (1976-2018)" \
   --x-label "Urban Population" \
+  --axis-number-format exp \
   --top-n 10 \
   --width 800 \
   --height 500 \
   --fps 12 \
   --steps 3
-
-# Example with Tech Giants Market Cap dataset:
-bar-chart-race \
-  --input examples/data/tech_market_cap.csv \
-  --output race_tech.gif \
-  --title "Top Global Companies by Market Cap (\$B)" \
-  --x-label "Market Cap (\$B)" \
-  --top-n 8 \
-  --fps 20 \
-  --steps 12
 ```
 
 ### Options
@@ -71,6 +68,14 @@ bar-chart-race \
 - `--max-x <FLOAT>`: Fixed upper limit for the X-axis
 - `--ascending`: Sort in ascending order (smallest values at the top)
 - `--clamp-exit`: Clamp exit/entry animations to the bottom edge instead of following actual rank trajectory
+- `--label-position <y-axis|bar-tip>`: Position of bar labels: `y-axis` (beside Y axis with values at bar tips, default) or `bar-tip` (category name and value together at bar tips)
+- `--orientation <horizontal|vertical>`: Orientation of bars: `horizontal` (default) or `vertical` (bars grow upward, ranks left-to-right)
+- `--log-scale`: Use logarithmic scale for values
+- `--log-min <FLOAT>`: Baseline and minimum positive value for logarithmic scale (default: `1.0`, values below are clamped to length 0)
+- `--number-format <auto|integer|compact|scientific|exp|fixed1|fixed2>`: Formatting for values and axis ticks (e.g. `exp` for $10^9$ / $1.5\times 10^9$, default: `auto`)
+- `--axis-number-format <auto|integer|compact|scientific|exp|fixed1|fixed2>`: Override number format specifically for axis ticks
+- `--bar-number-format <auto|integer|compact|scientific|exp|fixed1|fixed2>`: Override number format specifically for bar value labels
+- `--hide-bar-labels`: Hide value/name labels attached to the bars
 
 ## Sample Datasets
 
