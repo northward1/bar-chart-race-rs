@@ -38,6 +38,8 @@ pub struct ChartConfig {
     pub ascending: bool,
     pub label_position: LabelPosition,
     pub orientation: Orientation,
+    pub log_scale: bool,
+    pub log_min: f64,
 }
 
 impl Default for ChartConfig {
@@ -56,6 +58,8 @@ impl Default for ChartConfig {
             ascending: false,
             label_position: LabelPosition::default(),
             orientation: Orientation::default(),
+            log_scale: false,
+            log_min: 1.0,
         }
     }
 }

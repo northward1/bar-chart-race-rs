@@ -129,3 +129,35 @@ fn test_orientations() {
         assert!(metadata.len() > 0);
     }
 }
+
+#[test]
+fn test_log_scale() {
+    use bar_chart_race::Orientation;
+
+    let data =
+        TimeSeriesData::from_csv("examples/data/cities.csv").expect("CSV loading should succeed");
+
+    for orientation in [Orientation::Horizontal, Orientation::Vertical] {
+        let config = ChartConfig {
+            width: 400,
+            height: 300,
+            fps: 10,
+            steps_per_period: 2,
+            top_n: 3,
+            orientation,
+            log_scale: true,
+            log_min: 0.5,
+            ..Default::default()
+        };
+
+        let frames = Interpolator::generate_frames_from_config(&data, &config);
+        let tmp_file = NamedTempFile::new().expect("Create temp file");
+        let renderer = Renderer::new(config);
+        renderer
+            .render_gif(&frames, tmp_file.path())
+            .expect("Rendering should succeed");
+
+        let metadata = std::fs::metadata(tmp_file.path()).expect("File metadata");
+        assert!(metadata.len() > 0);
+    }
+}

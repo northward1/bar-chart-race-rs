@@ -68,6 +68,14 @@ struct Args {
     /// Orientation of bars: 'horizontal' (default) or 'vertical'
     #[arg(long, value_enum, default_value_t = Orientation::Horizontal)]
     orientation: Orientation,
+
+    /// Use logarithmic scale for values
+    #[arg(long)]
+    log_scale: bool,
+
+    /// Baseline / minimum positive value for logarithmic scale
+    #[arg(long, default_value_t = 1.0)]
+    log_min: f64,
 }
 
 fn main() -> Result<()> {
@@ -90,6 +98,8 @@ fn main() -> Result<()> {
         ascending: args.ascending,
         label_position: args.label_position,
         orientation: args.orientation,
+        log_scale: args.log_scale,
+        log_min: args.log_min,
     };
 
     println!(

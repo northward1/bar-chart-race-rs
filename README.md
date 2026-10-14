@@ -73,6 +73,8 @@ bar-chart-race \
 - `--clamp-exit`: Clamp exit/entry animations to the bottom edge instead of following actual rank trajectory
 - `--label-position <y-axis|bar-tip>`: Position of bar labels: `y-axis` (beside Y axis with values at bar tips, default) or `bar-tip` (category name and value together at bar tips)
 - `--orientation <horizontal|vertical>`: Orientation of bars: `horizontal` (default) or `vertical` (bars grow upward, ranks left-to-right)
+- `--log-scale`: Use logarithmic scale for values
+- `--log-min <FLOAT>`: Baseline and minimum positive value for logarithmic scale (default: `1.0`, values below are clamped to length 0)
 
 ## Sample Datasets
 
