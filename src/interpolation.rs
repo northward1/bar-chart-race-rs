@@ -1,3 +1,4 @@
+use crate::config::ChartConfig;
 use crate::data::TimeSeriesData;
 use std::collections::HashMap;
 
@@ -19,15 +20,29 @@ pub struct Frame {
 pub struct Interpolator;
 
 impl Interpolator {
+    /// Generate frames using explicit parameters (backwards compatible)
     pub fn generate_frames(
         data: &TimeSeriesData,
         steps_per_period: usize,
         top_n: usize,
     ) -> Vec<Frame> {
+        let config = ChartConfig {
+            steps_per_period,
+            top_n,
+            ..Default::default()
+        };
+        Self::generate_frames_from_config(data, &config)
+    }
+
+    /// Generate frames according to full ChartConfig (supporting ascending sort and exit animations)
+    pub fn generate_frames_from_config(data: &TimeSeriesData, config: &ChartConfig) -> Vec<Frame> {
         let n_periods = data.periods.len();
         if n_periods == 0 {
             return Vec::new();
         }
+
+        let steps_per_period = config.steps_per_period;
+        let top_n = config.top_n;
 
         // Persistent category color mapping
         let color_map: HashMap<String, usize> = data
@@ -53,7 +68,13 @@ impl Interpolator {
                     (cat, val)
                 })
                 .collect();
-            cat_vals.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+            if config.ascending {
+                cat_vals.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+            } else {
+                cat_vals.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            }
+
             let mut ranks = HashMap::new();
             for (rank, (cat, _)) in cat_vals.into_iter().enumerate() {
                 ranks.insert((*cat).clone(), rank);
@@ -62,6 +83,7 @@ impl Interpolator {
         }
 
         let mut frames = Vec::new();
+        let fallback_rank = data.categories.len();
 
         for i in 0..n_periods {
             let next_i = (i + 1).min(n_periods - 1);
@@ -106,20 +128,24 @@ impl Interpolator {
                         .unwrap_or(v0);
                     let val = v0 + (v1 - v0) * t;
 
-                    let r0 = ranks_0.get(cat).copied().unwrap_or(top_n) as f64;
-                    let r1 = ranks_1.get(cat).copied().unwrap_or(top_n) as f64;
+                    let r0 = ranks_0.get(cat).copied().unwrap_or(fallback_rank) as f64;
+                    let r1 = ranks_1.get(cat).copied().unwrap_or(fallback_rank) as f64;
 
                     // If both periods are outside top_n, skip
                     if r0 >= top_n as f64 && r1 >= top_n as f64 {
                         continue;
                     }
 
-                    // Smooth entry and exit from the bottom edge (top_n)
-                    let start_r = r0.min(top_n as f64);
-                    let end_r = r1.min(top_n as f64);
+                    // Exit animation: clamped to top_n (old behavior) or actual ranks (new default)
+                    let (start_r, end_r) = if config.clamp_exit {
+                        (r0.min(top_n as f64), r1.min(top_n as f64))
+                    } else {
+                        (r0, r1)
+                    };
                     let current_rank = start_r + (end_r - start_r) * ease_t;
 
-                    if current_rank <= top_n as f64 {
+                    // Only keep bars within or slightly below visible range
+                    if current_rank <= (top_n + 2) as f64 {
                         if current_rank < top_n as f64 && val > max_value {
                             max_value = val;
                         }

@@ -13,6 +13,7 @@ fn main() -> Result<()> {
         steps_per_period: 15,
         top_n: 5,
         title: "City Population Over Time (Millions)".to_string(),
+        ..Default::default()
     };
 
     let frames = Interpolator::generate_frames(&data, config.steps_per_period, config.top_n);

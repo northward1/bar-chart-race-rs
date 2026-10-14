@@ -12,8 +12,18 @@ Generates animated Bar Chart Race visualizations (e.g., animated GIF) directly f
 - **Persistent Category Colors**: Each entity keeps a consistent color throughout ranking swaps.
 - **CLI & Library**: Use as a standalone command-line tool or integrate into your own Rust project.
 
-## Installation / Setup
+## Demo
 
+![World Urban Population Demo](https://raw.githubusercontent.com/northward1/bar-chart-race-rs/main/race_urban.gif)
+
+## Installation
+
+### From crates.io
+```bash
+cargo install bar-chart-race
+```
+
+### From source
 ```bash
 git clone https://github.com/northward1/bar-chart-race-rs.git
 cd bar-chart-race-rs
@@ -23,35 +33,44 @@ cargo build --release
 ## CLI Usage
 
 ```bash
+# Example with World Urban Population dataset:
+bar-chart-race \
+  --input examples/data/urban_pop.csv \
+  --output race_urban.gif \
+  --title "World Urban Population (1976-2018)" \
+  --x-label "Urban Population" \
+  --top-n 10 \
+  --width 800 \
+  --height 500 \
+  --fps 12 \
+  --steps 3
+
 # Example with Tech Giants Market Cap dataset:
-./target/release/bar-chart-race \
+bar-chart-race \
   --input examples/data/tech_market_cap.csv \
   --output race_tech.gif \
   --title "Top Global Companies by Market Cap (\$B)" \
+  --x-label "Market Cap (\$B)" \
   --top-n 8 \
   --fps 20 \
   --steps 12
-
-# Example with World Urban Population dataset:
-./target/release/bar-chart-race \
-  --input examples/data/urban_pop.csv \
-  --output race_urban.gif \
-  --title "World Urban Population" \
-  --top-n 10 \
-  --fps 15 \
-  --steps 5
 ```
 
 ### Options
 
 - `-i, --input <PATH>`: Input CSV file path (wide-format: 1st column is date/period, rest are categories)
 - `-o, --output <PATH>`: Output GIF file path (default: `output.gif`)
-- `-t, --title <STRING>`: Chart title
+- `-t, --title <STRING>`: Chart title (default: `Bar Chart Race`)
 - `-n, --top-n <NUMBER>`: Number of top bars to display (default: `10`)
 - `--fps <NUMBER>`: Frame rate for the output GIF (default: `30`)
 - `-s, --steps <NUMBER>`: Number of interpolated intermediate frames between periods (default: `15`)
 - `--width <PIXELS>`: Width of output image (default: `1024`)
 - `--height <PIXELS>`: Height of output image (default: `768`)
+- `--x-label <STRING>`: Description label for the X-axis (value axis)
+- `--y-label <STRING>`: Description label for the Y-axis (category axis)
+- `--max-x <FLOAT>`: Fixed upper limit for the X-axis
+- `--ascending`: Sort in ascending order (smallest values at the top)
+- `--clamp-exit`: Clamp exit/entry animations to the bottom edge instead of following actual rank trajectory
 
 ## Sample Datasets
 
@@ -74,6 +93,7 @@ fn main() -> anyhow::Result<()> {
         steps_per_period: 12,
         top_n: 8,
         title: "Top Global Companies by Market Cap ($B)".to_string(),
+        ..Default::default()
     };
 
     let frames = Interpolator::generate_frames(&data, config.steps_per_period, config.top_n);
