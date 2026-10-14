@@ -37,22 +37,41 @@ impl Renderer {
                     BitMapBackend::with_buffer(&mut buf, (width, height)).into_drawing_area();
                 root.fill(&WHITE)?;
 
+                let x_max = self.config.max_x.unwrap_or(frame.max_value * 1.2).max(1.0);
+
                 let mut chart = ChartBuilder::on(&root)
                     .caption(&self.config.title, ("sans-serif", 32).into_font())
                     .margin(30)
                     .x_label_area_size(40)
-                    .y_label_area_size(40)
-                    .build_cartesian_2d(
-                        0.0..(frame.max_value * 1.2).max(1.0),
-                        0.0..self.config.top_n as f64,
-                    )?;
+                    .y_label_area_size(if self.config.y_label.is_some() {
+                        60
+                    } else {
+                        40
+                    })
+                    .build_cartesian_2d(0.0..x_max, 0.0..self.config.top_n as f64)?;
 
-                chart
-                    .configure_mesh()
-                    .disable_y_mesh()
-                    .disable_y_axis()
-                    .x_desc("Value")
-                    .draw()?;
+                let mut mesh = chart.configure_mesh();
+                mesh.disable_y_mesh();
+                if let Some(ref y_label) = self.config.y_label {
+                    mesh.y_desc(y_label);
+                } else {
+                    mesh.disable_y_axis();
+                }
+
+                if let Some(ref x_label) = self.config.x_label {
+                    mesh.x_desc(x_label);
+                }
+                mesh.draw()?;
+
+                // Draw period/time label in bottom-right (clear of x-axis ticks)
+                let period_style = TextStyle::from(("sans-serif", 52).into_font())
+                    .color(&BLACK)
+                    .pos(Pos::new(HPos::Right, VPos::Bottom));
+                root.draw_text(
+                    &frame.period_label,
+                    &period_style,
+                    (width as i32 - 50, height as i32 - 65),
+                )?;
 
                 // Render bars smoothly based on continuous rank
                 for bar in &frame.bars {
@@ -88,17 +107,6 @@ impl Renderer {
                         ("sans-serif", 15).into_font().color(&BLACK),
                     )))?;
                 }
-
-                // Draw period/time label in bottom-right
-                let period_color = BLACK.mix(0.65);
-                let period_style = TextStyle::from(("sans-serif", 44).into_font())
-                    .color(&period_color)
-                    .pos(Pos::new(HPos::Right, VPos::Bottom));
-                root.draw_text(
-                    &frame.period_label,
-                    &period_style,
-                    (width as i32 - 40, height as i32 - 40),
-                )?;
 
                 root.present()?;
             }

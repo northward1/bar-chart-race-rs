@@ -1,6 +1,6 @@
 [package]
 name = "bar-chart-race"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "A fast and customizable Bar Chart Race generator in Rust using Plotters"
 license = "MIT"
@@ -8,6 +8,7 @@ repository = "https://github.com/northward1/bar-chart-race-rs"
 readme = "README.md"
 keywords = ["visualization", "chart", "bar-chart-race", "plotters", "animation"]
 categories = ["visualization", "command-line-utilities"]
+exclude = ["*.gif"]
 
 [dependencies]
 plotters = { version = "0.3", default-features = false, features = ["bitmap_backend", "bitmap_encoder", "all_elements", "ttf"] }
