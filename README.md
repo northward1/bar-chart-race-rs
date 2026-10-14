@@ -39,6 +39,7 @@ bar-chart-race \
   --output race_urban.gif \
   --title "World Urban Population (1976-2018)" \
   --x-label "Urban Population" \
+  --number-format exp \
   --top-n 10 \
   --width 800 \
   --height 500 \
@@ -75,6 +76,7 @@ bar-chart-race \
 - `--orientation <horizontal|vertical>`: Orientation of bars: `horizontal` (default) or `vertical` (bars grow upward, ranks left-to-right)
 - `--log-scale`: Use logarithmic scale for values
 - `--log-min <FLOAT>`: Baseline and minimum positive value for logarithmic scale (default: `1.0`, values below are clamped to length 0)
+- `--number-format <auto|integer|compact|scientific|exp|fixed1|fixed2>`: Formatting for values and axis ticks (e.g. `exp` for $10^9$ / $1.5\times 10^9$, default: `auto`)
 
 ## Sample Datasets
 

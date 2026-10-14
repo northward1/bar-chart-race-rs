@@ -23,6 +23,32 @@ pub enum Orientation {
     Vertical,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize, Deserialize, Default)]
+pub enum NumberFormat {
+    /// Automatic formatting (e.g. integer for >=1000, 1 decimal for >=10, 2 decimals otherwise)
+    #[default]
+    #[value(name = "auto")]
+    Auto,
+    /// Integer only (e.g. 1000, 42)
+    #[value(name = "integer")]
+    Integer,
+    /// Compact notation with SI units (e.g. 1.5B, 20.3M, 450K)
+    #[value(name = "compact")]
+    Compact,
+    /// Scientific notation (e.g. 1.5e9, 2.0e7)
+    #[value(name = "scientific")]
+    Scientific,
+    /// Exponential notation with superscripts (e.g. 10⁹, 1.5×10⁹)
+    #[value(name = "exp")]
+    Exp,
+    /// Fixed 1 decimal place (e.g. 1000.0, 42.5)
+    #[value(name = "fixed1")]
+    Fixed1,
+    /// Fixed 2 decimal places (e.g. 1000.00, 42.50)
+    #[value(name = "fixed2")]
+    Fixed2,
+}
+
 #[derive(Debug, Clone)]
 pub struct ChartConfig {
     pub width: u32,
@@ -40,6 +66,7 @@ pub struct ChartConfig {
     pub orientation: Orientation,
     pub log_scale: bool,
     pub log_min: f64,
+    pub number_format: NumberFormat,
 }
 
 impl Default for ChartConfig {
@@ -60,6 +87,7 @@ impl Default for ChartConfig {
             orientation: Orientation::default(),
             log_scale: false,
             log_min: 1.0,
+            number_format: NumberFormat::default(),
         }
     }
 }

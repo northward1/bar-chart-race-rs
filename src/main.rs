@@ -3,7 +3,7 @@ use clap::Parser;
 use std::path::PathBuf;
 
 use bar_chart_race::{
-    ChartConfig, Interpolator, LabelPosition, Orientation, Renderer, TimeSeriesData,
+    ChartConfig, Interpolator, LabelPosition, NumberFormat, Orientation, Renderer, TimeSeriesData,
 };
 
 #[derive(Parser, Debug)]
@@ -76,6 +76,10 @@ struct Args {
     /// Baseline / minimum positive value for logarithmic scale
     #[arg(long, default_value_t = 1.0)]
     log_min: f64,
+
+    /// Number format for values and axis ticks: 'auto', 'integer', 'compact', 'scientific', 'exp', 'fixed1', 'fixed2'
+    #[arg(long, value_enum, default_value_t = NumberFormat::Auto)]
+    number_format: NumberFormat,
 }
 
 fn main() -> Result<()> {
@@ -112,6 +116,7 @@ fn main() -> Result<()> {
         orientation: args.orientation,
         log_scale: args.log_scale,
         log_min: args.log_min,
+        number_format: args.number_format,
     };
 
     println!(

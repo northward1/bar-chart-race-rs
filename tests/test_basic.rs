@@ -188,3 +188,40 @@ fn test_auto_clamp_top_n() {
         }
     }
 }
+
+#[test]
+fn test_number_formats() {
+    use bar_chart_race::NumberFormat;
+
+    let data =
+        TimeSeriesData::from_csv("examples/data/cities.csv").expect("CSV loading should succeed");
+
+    for fmt in [
+        NumberFormat::Integer,
+        NumberFormat::Compact,
+        NumberFormat::Scientific,
+        NumberFormat::Exp,
+        NumberFormat::Fixed1,
+        NumberFormat::Fixed2,
+    ] {
+        let config = ChartConfig {
+            width: 400,
+            height: 300,
+            fps: 10,
+            steps_per_period: 2,
+            top_n: 3,
+            number_format: fmt,
+            ..Default::default()
+        };
+
+        let frames = Interpolator::generate_frames_from_config(&data, &config);
+        let tmp_file = NamedTempFile::new().expect("Create temp file");
+        let renderer = Renderer::new(config);
+        renderer
+            .render_gif(&frames, tmp_file.path())
+            .expect("Rendering should succeed");
+
+        let metadata = std::fs::metadata(tmp_file.path()).expect("File metadata");
+        assert!(metadata.len() > 0);
+    }
+}

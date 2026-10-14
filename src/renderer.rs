@@ -7,20 +7,91 @@ use std::fs::File;
 use std::path::Path;
 use std::time::Duration;
 
-use crate::config::{ChartConfig, LabelPosition, Orientation};
+use crate::config::{ChartConfig, LabelPosition, NumberFormat, Orientation};
 use crate::interpolation::Frame;
 
 pub struct Renderer {
     config: ChartConfig,
 }
 
-fn format_value(value: f64) -> String {
-    if value >= 1_000.0 {
-        format!("{:.0}", value)
-    } else if value >= 10.0 {
-        format!("{:.1}", value)
+fn to_superscript(exp: i32) -> String {
+    let s = exp.to_string();
+    s.chars()
+        .map(|c| match c {
+            '-' => '⁻',
+            '0' => '⁰',
+            '1' => '¹',
+            '2' => '²',
+            '3' => '³',
+            '4' => '⁴',
+            '5' => '⁵',
+            '6' => '⁶',
+            '7' => '⁷',
+            '8' => '⁸',
+            '9' => '⁹',
+            _ => c,
+        })
+        .collect()
+}
+
+fn format_exp(value: f64) -> String {
+    if value == 0.0 {
+        return "0".to_string();
+    }
+    let abs_val = value.abs();
+    let exp = abs_val.log10().floor() as i32;
+    let mantissa = value / 10f64.powi(exp);
+
+    if exp == 0 {
+        return if mantissa.fract().abs() < 1e-4 {
+            format!("{:.0}", mantissa)
+        } else {
+            format!("{:.1}", mantissa)
+        };
+    }
+
+    let sup = to_superscript(exp);
+    if (mantissa.abs() - 1.0).abs() < 1e-4 {
+        if mantissa < 0.0 {
+            format!("-10{}", sup)
+        } else {
+            format!("10{}", sup)
+        }
     } else {
-        format!("{:.2}", value)
+        format!("{:.1}×10{}", mantissa, sup)
+    }
+}
+
+pub fn format_number(value: f64, format: NumberFormat) -> String {
+    match format {
+        NumberFormat::Auto => {
+            if value >= 1_000.0 {
+                format!("{:.0}", value)
+            } else if value >= 10.0 {
+                format!("{:.1}", value)
+            } else {
+                format!("{:.2}", value)
+            }
+        }
+        NumberFormat::Integer => format!("{:.0}", value.round()),
+        NumberFormat::Compact => {
+            let abs_val = value.abs();
+            if abs_val >= 1_000_000_000.0 {
+                format!("{:.2}B", value / 1_000_000_000.0)
+            } else if abs_val >= 1_000_000.0 {
+                format!("{:.2}M", value / 1_000_000.0)
+            } else if abs_val >= 1_000.0 {
+                format!("{:.1}K", value / 1_000.0)
+            } else if abs_val >= 10.0 {
+                format!("{:.1}", value)
+            } else {
+                format!("{:.2}", value)
+            }
+        }
+        NumberFormat::Scientific => format!("{:.2e}", value),
+        NumberFormat::Exp => format_exp(value),
+        NumberFormat::Fixed1 => format!("{:.1}", value),
+        NumberFormat::Fixed2 => format!("{:.2}", value),
     }
 }
 
@@ -146,6 +217,13 @@ impl Renderer {
                 if let Some(ref x_label) = self.config.x_label {
                     mesh.x_desc(x_label);
                 }
+
+                let num_format = self.config.number_format;
+                let formatter = move |v: &f64| format_number(*v, num_format);
+                if num_format != NumberFormat::Auto {
+                    mesh.x_label_formatter(&formatter);
+                }
+
                 mesh.draw()?;
 
                 // Draw period/time label in bottom-right (clear of x-axis ticks)
@@ -167,6 +245,11 @@ impl Renderer {
                     .color(&BLACK)
                     .pos(Pos::new(HPos::Right, VPos::Center));
 
+                // Position value label vertically centered with the bar (VPos::Center)
+                let val_text_style = TextStyle::from(("sans-serif", 15).into_font())
+                    .color(&BLACK)
+                    .pos(Pos::new(HPos::Left, VPos::Center));
+
                 for bar in &frame.bars {
                     let y = self.config.top_n as f64 - 1.0 - bar.rank;
 
@@ -183,7 +266,7 @@ impl Renderer {
                         color,
                     )))?;
 
-                    let val_str = format_value(bar.value);
+                    let val_str = format_number(bar.value, num_format);
 
                     match self.config.label_position {
                         LabelPosition::YAxis => {
@@ -196,7 +279,7 @@ impl Renderer {
                             $chart.draw_series(std::iter::once(Text::new(
                                 format!("  {}", val_str),
                                 (bar_len, y + 0.5),
-                                ("sans-serif", 15).into_font().color(&BLACK),
+                                val_text_style.clone(),
                             )))?;
                         }
                         LabelPosition::BarTip => {
@@ -204,7 +287,7 @@ impl Renderer {
                             $chart.draw_series(std::iter::once(Text::new(
                                 label,
                                 (bar_len, y + 0.5),
-                                ("sans-serif", 15).into_font().color(&BLACK),
+                                val_text_style.clone(),
                             )))?;
                         }
                     }
@@ -270,6 +353,13 @@ impl Renderer {
                 if let Some(ref x_label) = self.config.x_label {
                     mesh.x_desc(x_label);
                 }
+
+                let num_format = self.config.number_format;
+                let formatter = move |v: &f64| format_number(*v, num_format);
+                if num_format != NumberFormat::Auto {
+                    mesh.y_label_formatter(&formatter);
+                }
+
                 mesh.draw()?;
 
                 // Draw period/time label in top-right for vertical orientation
@@ -308,7 +398,7 @@ impl Renderer {
                         color,
                     )))?;
 
-                    let val_str = format_value(bar.value);
+                    let val_str = format_number(bar.value, num_format);
 
                     let (px, py) = $chart
                         .plotting_area()
