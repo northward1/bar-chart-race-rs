@@ -216,23 +216,25 @@ impl Renderer {
         let period_label_size = self.config.effective_period_label_size();
 
         let x_label_area_size = if self.config.x_label.is_some() {
-            axis_label_size * 2 + 16
+            axis_label_size * 2 + 10
         } else {
-            axis_label_size + 18
+            axis_label_size + 8
         };
+
+        let margin_top = if self.config.is_title_visible() { 6 } else { 8 };
+        let margin_bottom = 8;
+        let margin_right = 15;
 
         let mut builder = ChartBuilder::on(root);
         if self.config.is_title_visible() {
             let title_size = self.config.effective_title_size();
             builder.caption(&self.config.title, ("sans-serif", title_size).into_font());
-            let margin_top = (title_size as f32 * 0.45).round() as u32;
-            builder.margin_top(margin_top.max(10));
-        } else {
-            builder.margin_top(15);
         }
         builder
-            .margin(25)
+            .margin_top(margin_top)
+            .margin_bottom(margin_bottom)
             .margin_left(margin_left)
+            .margin_right(margin_right)
             .x_label_area_size(x_label_area_size)
             .y_label_area_size(y_label_area_size);
 
@@ -268,10 +270,12 @@ impl Renderer {
                 let period_style = TextStyle::from(("sans-serif", period_label_size).into_font())
                     .color(&BLACK)
                     .pos(Pos::new(HPos::Right, VPos::Bottom));
+                let period_bottom_y =
+                    height as i32 - (margin_bottom + x_label_area_size + 10) as i32;
                 root.draw_text(
                     &frame.period_label,
                     &period_style,
-                    (width as i32 - 50, height as i32 - 60),
+                    (width as i32 - 40, period_bottom_y),
                 )?;
 
                 let (_, top_py) = $chart
@@ -367,34 +371,42 @@ impl Renderer {
         let period_label_size = self.config.effective_period_label_size();
 
         let y_label_area_size = if self.config.y_label.is_some() {
-            axis_label_size * 4 + 17
+            axis_label_size * 4 + 10
         } else {
-            axis_label_size * 3 + 14
+            axis_label_size * 3 + 8
         };
         let name_space = match self.config.label_position {
-            LabelPosition::YAxis => bar_label_size + 8,
-            LabelPosition::BarTip => 10,
+            LabelPosition::YAxis => bar_label_size + 6,
+            LabelPosition::BarTip => 8,
         };
         let x_desc_space = if self.config.x_label.is_some() {
-            axis_label_size + 14
+            axis_label_size + 8
         } else {
             0
         };
-        let x_label_area_size = name_space + x_desc_space + 15;
+        let x_label_area_size = name_space + x_desc_space + 8;
+
+        let margin_bottom = 8;
+        let margin_left = 15;
+        let margin_right = 15;
 
         let mut builder = ChartBuilder::on(root);
-        let period_top_y = if self.config.is_title_visible() {
+        let (margin_top, period_top_y) = if self.config.is_title_visible() {
             let title_size = self.config.effective_title_size();
             builder.caption(&self.config.title, ("sans-serif", title_size).into_font());
-            let margin_top = (title_size as f32 * 0.9).round() as u32 + 5;
-            builder.margin_top(margin_top.max(25));
-            (title_size as f32 * 1.1).round() as i32 + 10
+            let m_top = 8;
+            let p_y = (title_size as f32 * 1.1).round() as i32 + 8;
+            (m_top, p_y)
         } else {
-            builder.margin_top(period_label_size + 15);
-            15
+            let m_top = period_label_size + 10;
+            let p_y = 6;
+            (m_top, p_y)
         };
         builder
-            .margin(25)
+            .margin_top(margin_top)
+            .margin_bottom(margin_bottom)
+            .margin_left(margin_left)
+            .margin_right(margin_right)
             .x_label_area_size(x_label_area_size)
             .y_label_area_size(y_label_area_size);
 
