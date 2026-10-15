@@ -8,7 +8,7 @@ repository = "https://github.com/northward1/bar-chart-race-rs"
 readme = "README.md"
 keywords = ["visualization", "chart", "bar-chart-race", "plotters", "animation"]
 categories = ["visualization", "command-line-utilities"]
-exclude = ["*.gif"]
+exclude = ["*.gif", "*.webp", "*.mp4"]
 
 [dependencies]
 plotters = { version = "0.3", default-features = false, features = ["bitmap_backend", "bitmap_encoder", "all_elements", "ttf"] }

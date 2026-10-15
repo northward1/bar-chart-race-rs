@@ -383,3 +383,74 @@ fn test_hide_title_and_font_sizes() {
         .expect("Vertical rendering with empty title should succeed");
     assert!(std::fs::metadata(tmp_file_v.path()).unwrap().len() > 0);
 }
+
+#[test]
+fn test_render_auto_format_gif() {
+    let data =
+        TimeSeriesData::from_csv("examples/data/cities.csv").expect("CSV loading should succeed");
+    let config = ChartConfig {
+        width: 300,
+        height: 200,
+        fps: 10,
+        steps_per_period: 1,
+        top_n: 3,
+        ..Default::default()
+    };
+    let frames = Interpolator::generate_frames_from_config(&data, &config);
+    let tmp_file = NamedTempFile::new().expect("Create temp file");
+    let renderer = Renderer::new(config);
+
+    // render() should route to GIF automatically
+    renderer
+        .render(&frames, tmp_file.path())
+        .expect("Auto routing to GIF should succeed");
+    assert!(std::fs::metadata(tmp_file.path()).unwrap().len() > 0);
+}
+
+#[test]
+fn test_render_mp4_and_webp() {
+    // Only run if ffmpeg is available
+    if std::process::Command::new("ffmpeg")
+        .arg("-version")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .is_err()
+    {
+        println!("Skipping ffmpeg video tests: ffmpeg is not available");
+        return;
+    }
+
+    let data =
+        TimeSeriesData::from_csv("examples/data/cities.csv").expect("CSV loading should succeed");
+    let config = ChartConfig {
+        width: 320,
+        height: 240,
+        fps: 10,
+        steps_per_period: 1,
+        top_n: 3,
+        ..Default::default()
+    };
+    let frames = Interpolator::generate_frames_from_config(&data, &config);
+    let renderer = Renderer::new(config);
+
+    // Test MP4
+    let tmp_mp4 = tempfile::Builder::new()
+        .suffix(".mp4")
+        .tempfile()
+        .expect("Create temp mp4");
+    renderer
+        .render(&frames, tmp_mp4.path())
+        .expect("MP4 rendering should succeed");
+    assert!(std::fs::metadata(tmp_mp4.path()).unwrap().len() > 0);
+
+    // Test WebP
+    let tmp_webp = tempfile::Builder::new()
+        .suffix(".webp")
+        .tempfile()
+        .expect("Create temp webp");
+    renderer
+        .render(&frames, tmp_webp.path())
+        .expect("WebP rendering should succeed");
+    assert!(std::fs::metadata(tmp_webp.path()).unwrap().len() > 0);
+}

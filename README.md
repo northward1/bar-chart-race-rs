@@ -10,11 +10,12 @@ Generates animated Bar Chart Race visualizations (e.g., animated GIF) directly f
 - **Smooth Ranking & Value Interpolation**: Cubic easing (`easeInOutCubic`) ensures bars glide smoothly as they overtake each other.
 - **Entry & Exit Animations**: Bars dropping below or rising into the top-N slide smoothly in and out from the bottom edge.
 - **Persistent Category Colors**: Each entity keeps a consistent color throughout ranking swaps.
+- **Multiple Output Formats**: Supports animated GIF (built-in pure Rust encoder) as well as MP4, WebM, and animated WebP (via ffmpeg).
 - **CLI & Library**: Use as a standalone command-line tool or integrate into your own Rust project.
 
 ## Demo
 
-![World Urban Population Demo](https://raw.githubusercontent.com/northward1/bar-chart-race-rs/main/race_urban.gif)
+![World Urban Population Demo](https://raw.githubusercontent.com/northward1/bar-chart-race-rs/main/race_urban.webp)
 
 ## Installation
 
@@ -42,7 +43,7 @@ bar-chart-race \
 # Example with World Urban Population dataset:
 bar-chart-race \
   --input examples/data/urban_pop.csv \
-  --output race_urban.gif \
+  --output race_urban.webp \
   --title "World Urban Population (1976-2018)" \
   --x-label "Urban Population" \
   --axis-number-format exp \
@@ -56,7 +57,7 @@ bar-chart-race \
 ### Options
 
 - `-i, --input <PATH>`: Input CSV file path (wide-format: 1st column is date/period, rest are categories)
-- `-o, --output <PATH>`: Output GIF file path (default: `output.gif`)
+- `-o, --output <PATH>`: Output file path (.gif, .mp4, .webm, .webp; default: `output.gif`)
 - `-t, --title <STRING>`: Chart title (default: `Bar Chart Race`)
 - `-n, --top-n <NUMBER>`: Number of top bars to display (default: `10`)
 - `--fps <NUMBER>`: Frame rate for the output GIF (default: `30`)

@@ -4,7 +4,9 @@ use image::{Delay, Frame as ImgFrame, RgbImage};
 use plotters::prelude::*;
 use plotters::style::text_anchor::{HPos, Pos, VPos};
 use std::fs::File;
+use std::io::Write;
 use std::path::Path;
+use std::process::{Command, Stdio};
 use std::time::Duration;
 
 use crate::config::{ChartConfig, LabelPosition, NumberFormat, Orientation};
@@ -100,6 +102,105 @@ impl Renderer {
         Self { config }
     }
 
+    /// Automatically render frames to the format indicated by the output path extension (e.g. .gif, .mp4, .webm, .webp)
+    pub fn render<P: AsRef<Path>>(&self, frames: &[Frame], output_path: P) -> Result<()> {
+        self.render_with_progress(frames, output_path, |_, _| {})
+    }
+
+    /// Automatically render frames with progress reporting based on the file extension
+    pub fn render_with_progress<P, F>(
+        &self,
+        frames: &[Frame],
+        output_path: P,
+        on_progress: F,
+    ) -> Result<()>
+    where
+        P: AsRef<Path>,
+        F: FnMut(usize, usize),
+    {
+        let ext = output_path
+            .as_ref()
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+
+        if ext == "gif" || ext.is_empty() {
+            self.render_gif_with_progress(frames, output_path, on_progress)
+        } else {
+            self.render_video_via_ffmpeg(frames, output_path, on_progress)
+        }
+    }
+
+    /// Calculate horizontal margins based on category name font bounding boxes
+    fn calculate_margins(&self, frames: &[Frame]) -> (u32, u32) {
+        let bar_label_size = self.config.effective_bar_label_size();
+        let axis_label_size = self.config.effective_axis_label_size();
+        let name_font = ("sans-serif", bar_label_size).into_font();
+        match self.config.label_position {
+            LabelPosition::YAxis => {
+                let max_name_width = frames
+                    .iter()
+                    .flat_map(|f| &f.bars)
+                    .filter(|b| b.rank < self.config.top_n as f64)
+                    .map(|b| name_font.box_size(&b.name).map(|(w, _)| w).unwrap_or(0))
+                    .max()
+                    .unwrap_or(0);
+                let y_desc_space = if self.config.y_label.is_some() {
+                    axis_label_size * 2 + 6
+                } else {
+                    0
+                };
+                let area_size = max_name_width + 8 + y_desc_space;
+                (15, area_size)
+            }
+            LabelPosition::BarTip => {
+                let area_size = if self.config.y_label.is_some() {
+                    axis_label_size * 2 + 16
+                } else {
+                    15
+                };
+                (20, area_size)
+            }
+        }
+    }
+
+    /// Render a single frame to an RGB24 raw buffer
+    fn render_frame_to_buffer(
+        &self,
+        frame: &Frame,
+        width: u32,
+        height: u32,
+        margin_left: u32,
+        y_label_area_size: u32,
+    ) -> Result<Vec<u8>> {
+        let mut buf = vec![0u8; (width * height * 3) as usize];
+        {
+            let root = BitMapBackend::with_buffer(&mut buf, (width, height)).into_drawing_area();
+            root.fill(&WHITE)?;
+
+            let max_val = self.config.max_x.unwrap_or(frame.max_value * 1.2).max(1.0);
+
+            match self.config.orientation {
+                Orientation::Horizontal => {
+                    self.render_horizontal_frame(
+                        &root,
+                        frame,
+                        max_val,
+                        margin_left,
+                        y_label_area_size,
+                    )?;
+                }
+                Orientation::Vertical => {
+                    self.render_vertical_frame(&root, frame, max_val)?;
+                }
+            }
+
+            root.present()?;
+        }
+        Ok(buf)
+    }
+
     /// Render frames into an animated GIF using Plotters and the image crate
     pub fn render_gif<P: AsRef<Path>>(&self, frames: &[Frame], output_path: P) -> Result<()> {
         self.render_gif_with_progress(frames, output_path, |_, _| {})
@@ -124,65 +225,12 @@ impl Renderer {
         let width = self.config.width;
         let height = self.config.height;
 
-        let bar_label_size = self.config.effective_bar_label_size();
-        let axis_label_size = self.config.effective_axis_label_size();
-        let name_font = ("sans-serif", bar_label_size).into_font();
-        let (margin_left, y_label_area_size) = match self.config.label_position {
-            LabelPosition::YAxis => {
-                let max_name_width = frames
-                    .iter()
-                    .flat_map(|f| &f.bars)
-                    .filter(|b| b.rank < self.config.top_n as f64)
-                    .map(|b| name_font.box_size(&b.name).map(|(w, _)| w).unwrap_or(0))
-                    .max()
-                    .unwrap_or(0);
-                let y_desc_space = if self.config.y_label.is_some() {
-                    axis_label_size * 2 + 6
-                } else {
-                    0
-                };
-                // Keep 8px padding between the category text and the Y-axis (x=0)
-                let area_size = max_name_width + 8 + y_desc_space;
-                (15, area_size)
-            }
-            LabelPosition::BarTip => {
-                let area_size = if self.config.y_label.is_some() {
-                    axis_label_size * 2 + 16
-                } else {
-                    15
-                };
-                (20, area_size)
-            }
-        };
-
+        let (margin_left, y_label_area_size) = self.calculate_margins(frames);
         let total_frames = frames.len();
+
         for (i, frame) in frames.iter().enumerate() {
-            let mut buf = vec![0u8; (width * height * 3) as usize];
-
-            {
-                let root =
-                    BitMapBackend::with_buffer(&mut buf, (width, height)).into_drawing_area();
-                root.fill(&WHITE)?;
-
-                let max_val = self.config.max_x.unwrap_or(frame.max_value * 1.2).max(1.0);
-
-                match self.config.orientation {
-                    Orientation::Horizontal => {
-                        self.render_horizontal_frame(
-                            &root,
-                            frame,
-                            max_val,
-                            margin_left,
-                            y_label_area_size,
-                        )?;
-                    }
-                    Orientation::Vertical => {
-                        self.render_vertical_frame(&root, frame, max_val)?;
-                    }
-                }
-
-                root.present()?;
-            }
+            let buf =
+                self.render_frame_to_buffer(frame, width, height, margin_left, y_label_area_size)?;
 
             let rgb_img = RgbImage::from_raw(width, height, buf)
                 .ok_or_else(|| anyhow::anyhow!("Failed to create RgbImage from buffer"))?;
@@ -196,6 +244,87 @@ impl Renderer {
             );
             encoder.encode_frame(img_frame)?;
             on_progress(i + 1, total_frames);
+        }
+
+        Ok(())
+    }
+
+    /// Render frames into a video/animation format (.mp4, .webm, .webp, etc.) using ffmpeg
+    pub fn render_video_via_ffmpeg<P, F>(
+        &self,
+        frames: &[Frame],
+        output_path: P,
+        mut on_progress: F,
+    ) -> Result<()>
+    where
+        P: AsRef<Path>,
+        F: FnMut(usize, usize),
+    {
+        let ext = output_path
+            .as_ref()
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+
+        let width = self.config.width;
+        let height = self.config.height;
+
+        let mut cmd = Command::new("ffmpeg");
+        cmd.args([
+            "-y",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgb24",
+            "-s",
+            &format!("{}x{}", width, height),
+            "-r",
+            &format!("{}", self.config.fps),
+            "-i",
+            "-",
+            "-loglevel",
+            "error",
+        ]);
+
+        if ext == "mp4" {
+            cmd.args(["-c:v", "libx264", "-pix_fmt", "yuv420p"]);
+        } else if ext == "webp" {
+            cmd.args(["-loop", "0"]);
+        } else if ext == "webm" {
+            cmd.args(["-c:v", "libvpx-vp9", "-pix_fmt", "yuv420p"]);
+        }
+
+        cmd.arg(output_path.as_ref());
+        cmd.stdin(Stdio::piped());
+
+        let mut child = cmd.spawn().map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to execute ffmpeg for {:?}. Ensure ffmpeg is installed and in your PATH: {}",
+                output_path.as_ref(),
+                e
+            )
+        })?;
+
+        let mut stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| anyhow::anyhow!("Failed to open stdin for ffmpeg process"))?;
+
+        let (margin_left, y_label_area_size) = self.calculate_margins(frames);
+        let total_frames = frames.len();
+
+        for (i, frame) in frames.iter().enumerate() {
+            let buf =
+                self.render_frame_to_buffer(frame, width, height, margin_left, y_label_area_size)?;
+            stdin.write_all(&buf)?;
+            on_progress(i + 1, total_frames);
+        }
+
+        drop(stdin);
+        let status = child.wait()?;
+        if !status.success() {
+            anyhow::bail!("ffmpeg failed with status: {}", status);
         }
 
         Ok(())

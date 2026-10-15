@@ -13,7 +13,7 @@ struct Args {
     #[arg(short, long)]
     input: PathBuf,
 
-    /// Path to output GIF file
+    /// Path to output animation/video file (.gif, .mp4, .webm, .webp)
     #[arg(short, long, default_value = "output.gif")]
     output: PathBuf,
 
@@ -176,7 +176,13 @@ fn main() -> Result<()> {
     let frames = Interpolator::generate_frames_from_config(&data, &config);
     println!("Total frames generated: {}", frames.len());
 
-    println!("Rendering GIF to {:?}...", args.output);
+    let ext = args
+        .output
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("gif")
+        .to_uppercase();
+    println!("Rendering {} to {:?}...", ext, args.output);
     let pb = if args.no_progress {
         indicatif::ProgressBar::hidden()
     } else {
@@ -190,7 +196,7 @@ fn main() -> Result<()> {
     };
 
     let renderer = Renderer::new(config);
-    renderer.render_gif_with_progress(&frames, &args.output, |current, _total| {
+    renderer.render_with_progress(&frames, &args.output, |current, _total| {
         pb.set_position(current as u64);
     })?;
     pb.finish();
