@@ -289,3 +289,36 @@ fn test_axis_and_bar_number_formats() {
     let metadata = std::fs::metadata(tmp_file.path()).expect("File metadata");
     assert!(metadata.len() > 0);
 }
+
+#[test]
+fn test_render_gif_with_progress() {
+    let data =
+        TimeSeriesData::from_csv("examples/data/cities.csv").expect("CSV loading should succeed");
+
+    let config = ChartConfig {
+        width: 300,
+        height: 200,
+        fps: 10,
+        steps_per_period: 1,
+        top_n: 3,
+        title: "Progress Test".to_string(),
+        ..Default::default()
+    };
+
+    let frames = Interpolator::generate_frames_from_config(&data, &config);
+    let tmp_file = NamedTempFile::new().expect("Create temp file");
+    let renderer = Renderer::new(config);
+
+    let mut progress_calls = Vec::new();
+    renderer
+        .render_gif_with_progress(&frames, tmp_file.path(), |current, total| {
+            progress_calls.push((current, total));
+        })
+        .expect("Rendering should succeed");
+
+    assert_eq!(progress_calls.len(), frames.len());
+    for (i, &(current, total)) in progress_calls.iter().enumerate() {
+        assert_eq!(current, i + 1);
+        assert_eq!(total, frames.len());
+    }
+}

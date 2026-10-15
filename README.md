@@ -76,6 +76,7 @@ bar-chart-race \
 - `--axis-number-format <auto|integer|compact|scientific|exp|fixed1|fixed2>`: Override number format specifically for axis ticks
 - `--bar-number-format <auto|integer|compact|scientific|exp|fixed1|fixed2>`: Override number format specifically for bar value labels
 - `--hide-bar-labels`: Hide value/name labels attached to the bars
+- `--no-progress`: Disable the progress bar during GIF rendering
 
 ## Sample Datasets
 

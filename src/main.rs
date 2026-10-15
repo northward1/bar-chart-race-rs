@@ -92,6 +92,10 @@ struct Args {
     /// Hide labels (values/names) attached to the bars
     #[arg(long)]
     hide_bar_labels: bool,
+
+    /// Disable the progress bar during GIF rendering
+    #[arg(long)]
+    no_progress: bool,
 }
 
 fn main() -> Result<()> {
@@ -148,8 +152,23 @@ fn main() -> Result<()> {
     println!("Total frames generated: {}", frames.len());
 
     println!("Rendering GIF to {:?}...", args.output);
+    let pb = if args.no_progress {
+        indicatif::ProgressBar::hidden()
+    } else {
+        let pb = indicatif::ProgressBar::new(frames.len() as u64);
+        if let Ok(style) = indicatif::ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) [ETA: {eta}]")
+        {
+            pb.set_style(style.progress_chars("#>-"));
+        }
+        pb
+    };
+
     let renderer = Renderer::new(config);
-    renderer.render_gif(&frames, &args.output)?;
+    renderer.render_gif_with_progress(&frames, &args.output, |current, _total| {
+        pb.set_position(current as u64);
+    })?;
+    pb.finish();
 
     println!("Done! Saved to {:?}", args.output);
     Ok(())

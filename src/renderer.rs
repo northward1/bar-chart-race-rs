@@ -102,6 +102,20 @@ impl Renderer {
 
     /// Render frames into an animated GIF using Plotters and the image crate
     pub fn render_gif<P: AsRef<Path>>(&self, frames: &[Frame], output_path: P) -> Result<()> {
+        self.render_gif_with_progress(frames, output_path, |_, _| {})
+    }
+
+    /// Render frames into an animated GIF, calling `on_progress(current_frame, total_frames)` after each frame is processed
+    pub fn render_gif_with_progress<P, F>(
+        &self,
+        frames: &[Frame],
+        output_path: P,
+        mut on_progress: F,
+    ) -> Result<()>
+    where
+        P: AsRef<Path>,
+        F: FnMut(usize, usize),
+    {
         let delay_ms = 1000 / self.config.fps.max(1);
         let file = File::create(output_path)?;
         let mut encoder = GifEncoder::new(file);
@@ -135,7 +149,8 @@ impl Renderer {
             }
         };
 
-        for frame in frames {
+        let total_frames = frames.len();
+        for (i, frame) in frames.iter().enumerate() {
             let mut buf = vec![0u8; (width * height * 3) as usize];
 
             {
@@ -174,6 +189,7 @@ impl Renderer {
                 Delay::from_saturating_duration(Duration::from_millis(delay_ms as u64)),
             );
             encoder.encode_frame(img_frame)?;
+            on_progress(i + 1, total_frames);
         }
 
         Ok(())
