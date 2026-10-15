@@ -13,7 +13,7 @@ struct Args {
     #[arg(short, long)]
     input: PathBuf,
 
-    /// Path to output GIF file
+    /// Path to output animation/video file (.gif, .mp4, .webm, .webp)
     #[arg(short, long, default_value = "output.gif")]
     output: PathBuf,
 
@@ -92,6 +92,30 @@ struct Args {
     /// Hide labels (values/names) attached to the bars
     #[arg(long)]
     hide_bar_labels: bool,
+
+    /// Disable the progress bar during GIF rendering
+    #[arg(long)]
+    no_progress: bool,
+
+    /// Hide the chart title
+    #[arg(long)]
+    hide_title: bool,
+
+    /// Font size for the chart title (default: 32)
+    #[arg(long)]
+    title_size: Option<u32>,
+
+    /// Font size for bar labels (names and values, default: 15 for horizontal, 13 for vertical)
+    #[arg(long)]
+    bar_label_size: Option<u32>,
+
+    /// Font size for the period / time label in the corner (default: 52)
+    #[arg(long)]
+    period_label_size: Option<u32>,
+
+    /// Font size for axis tick numbers and axis descriptions (default: 12)
+    #[arg(long)]
+    axis_label_size: Option<u32>,
 }
 
 fn main() -> Result<()> {
@@ -132,6 +156,11 @@ fn main() -> Result<()> {
         axis_number_format: args.axis_number_format,
         bar_number_format: args.bar_number_format,
         hide_bar_labels: args.hide_bar_labels,
+        hide_title: args.hide_title,
+        title_size: args.title_size,
+        bar_label_size: args.bar_label_size,
+        period_label_size: args.period_label_size,
+        axis_label_size: args.axis_label_size,
     };
 
     println!(
@@ -147,9 +176,30 @@ fn main() -> Result<()> {
     let frames = Interpolator::generate_frames_from_config(&data, &config);
     println!("Total frames generated: {}", frames.len());
 
-    println!("Rendering GIF to {:?}...", args.output);
+    let ext = args
+        .output
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("gif")
+        .to_uppercase();
+    println!("Rendering {} to {:?}...", ext, args.output);
+    let pb = if args.no_progress {
+        indicatif::ProgressBar::hidden()
+    } else {
+        let pb = indicatif::ProgressBar::new(frames.len() as u64);
+        if let Ok(style) = indicatif::ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) [ETA: {eta}]")
+        {
+            pb.set_style(style.progress_chars("#>-"));
+        }
+        pb
+    };
+
     let renderer = Renderer::new(config);
-    renderer.render_gif(&frames, &args.output)?;
+    renderer.render_with_progress(&frames, &args.output, |current, _total| {
+        pb.set_position(current as u64);
+    })?;
+    pb.finish();
 
     println!("Done! Saved to {:?}", args.output);
     Ok(())

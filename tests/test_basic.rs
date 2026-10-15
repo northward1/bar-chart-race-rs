@@ -289,3 +289,168 @@ fn test_axis_and_bar_number_formats() {
     let metadata = std::fs::metadata(tmp_file.path()).expect("File metadata");
     assert!(metadata.len() > 0);
 }
+
+#[test]
+fn test_render_gif_with_progress() {
+    let data =
+        TimeSeriesData::from_csv("examples/data/cities.csv").expect("CSV loading should succeed");
+
+    let config = ChartConfig {
+        width: 300,
+        height: 200,
+        fps: 10,
+        steps_per_period: 1,
+        top_n: 3,
+        title: "Progress Test".to_string(),
+        ..Default::default()
+    };
+
+    let frames = Interpolator::generate_frames_from_config(&data, &config);
+    let tmp_file = NamedTempFile::new().expect("Create temp file");
+    let renderer = Renderer::new(config);
+
+    let mut progress_calls = Vec::new();
+    renderer
+        .render_gif_with_progress(&frames, tmp_file.path(), |current, total| {
+            progress_calls.push((current, total));
+        })
+        .expect("Rendering should succeed");
+
+    assert_eq!(progress_calls.len(), frames.len());
+    for (i, &(current, total)) in progress_calls.iter().enumerate() {
+        assert_eq!(current, i + 1);
+        assert_eq!(total, frames.len());
+    }
+}
+
+#[test]
+fn test_hide_title_and_font_sizes() {
+    let data =
+        TimeSeriesData::from_csv("examples/data/cities.csv").expect("CSV loading should succeed");
+
+    // Test horizontal with hidden title and custom font sizes
+    let config_h = ChartConfig {
+        width: 400,
+        height: 300,
+        fps: 10,
+        steps_per_period: 1,
+        top_n: 3,
+        title: "Hidden Title".to_string(),
+        hide_title: true,
+        title_size: Some(24),
+        bar_label_size: Some(10),
+        period_label_size: Some(30),
+        axis_label_size: Some(10),
+        x_label: Some("X Axis".to_string()),
+        y_label: Some("Y Axis".to_string()),
+        ..Default::default()
+    };
+    assert!(!config_h.is_title_visible());
+    assert_eq!(config_h.effective_title_size(), 24);
+    assert_eq!(config_h.effective_bar_label_size(), 10);
+    assert_eq!(config_h.effective_period_label_size(), 30);
+    assert_eq!(config_h.effective_axis_label_size(), 10);
+
+    let frames_h = Interpolator::generate_frames_from_config(&data, &config_h);
+    let tmp_file_h = NamedTempFile::new().expect("Create temp file");
+    let renderer_h = Renderer::new(config_h);
+    renderer_h
+        .render_gif(&frames_h, tmp_file_h.path())
+        .expect("Horizontal rendering with hidden title should succeed");
+    assert!(std::fs::metadata(tmp_file_h.path()).unwrap().len() > 0);
+
+    // Test vertical with empty title (should also treat as hidden) and custom font sizes
+    let config_v = ChartConfig {
+        width: 400,
+        height: 300,
+        fps: 10,
+        steps_per_period: 1,
+        top_n: 3,
+        title: "   ".to_string(), // whitespace-only title
+        orientation: bar_chart_race::Orientation::Vertical,
+        bar_label_size: Some(11),
+        period_label_size: Some(36),
+        axis_label_size: Some(9),
+        ..Default::default()
+    };
+    assert!(!config_v.is_title_visible());
+
+    let frames_v = Interpolator::generate_frames_from_config(&data, &config_v);
+    let tmp_file_v = NamedTempFile::new().expect("Create temp file");
+    let renderer_v = Renderer::new(config_v);
+    renderer_v
+        .render_gif(&frames_v, tmp_file_v.path())
+        .expect("Vertical rendering with empty title should succeed");
+    assert!(std::fs::metadata(tmp_file_v.path()).unwrap().len() > 0);
+}
+
+#[test]
+fn test_render_auto_format_gif() {
+    let data =
+        TimeSeriesData::from_csv("examples/data/cities.csv").expect("CSV loading should succeed");
+    let config = ChartConfig {
+        width: 300,
+        height: 200,
+        fps: 10,
+        steps_per_period: 1,
+        top_n: 3,
+        ..Default::default()
+    };
+    let frames = Interpolator::generate_frames_from_config(&data, &config);
+    let tmp_file = NamedTempFile::new().expect("Create temp file");
+    let renderer = Renderer::new(config);
+
+    // render() should route to GIF automatically
+    renderer
+        .render(&frames, tmp_file.path())
+        .expect("Auto routing to GIF should succeed");
+    assert!(std::fs::metadata(tmp_file.path()).unwrap().len() > 0);
+}
+
+#[test]
+fn test_render_mp4_and_webp() {
+    // Only run if ffmpeg is available
+    if std::process::Command::new("ffmpeg")
+        .arg("-version")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .is_err()
+    {
+        println!("Skipping ffmpeg video tests: ffmpeg is not available");
+        return;
+    }
+
+    let data =
+        TimeSeriesData::from_csv("examples/data/cities.csv").expect("CSV loading should succeed");
+    let config = ChartConfig {
+        width: 320,
+        height: 240,
+        fps: 10,
+        steps_per_period: 1,
+        top_n: 3,
+        ..Default::default()
+    };
+    let frames = Interpolator::generate_frames_from_config(&data, &config);
+    let renderer = Renderer::new(config);
+
+    // Test MP4
+    let tmp_mp4 = tempfile::Builder::new()
+        .suffix(".mp4")
+        .tempfile()
+        .expect("Create temp mp4");
+    renderer
+        .render(&frames, tmp_mp4.path())
+        .expect("MP4 rendering should succeed");
+    assert!(std::fs::metadata(tmp_mp4.path()).unwrap().len() > 0);
+
+    // Test WebP
+    let tmp_webp = tempfile::Builder::new()
+        .suffix(".webp")
+        .tempfile()
+        .expect("Create temp webp");
+    renderer
+        .render(&frames, tmp_webp.path())
+        .expect("WebP rendering should succeed");
+    assert!(std::fs::metadata(tmp_webp.path()).unwrap().len() > 0);
+}

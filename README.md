@@ -10,11 +10,12 @@ Generates animated Bar Chart Race visualizations (e.g., animated GIF) directly f
 - **Smooth Ranking & Value Interpolation**: Cubic easing (`easeInOutCubic`) ensures bars glide smoothly as they overtake each other.
 - **Entry & Exit Animations**: Bars dropping below or rising into the top-N slide smoothly in and out from the bottom edge.
 - **Persistent Category Colors**: Each entity keeps a consistent color throughout ranking swaps.
+- **Multiple Output Formats**: Supports animated GIF (built-in pure Rust encoder) as well as MP4, WebM, and animated WebP (via ffmpeg).
 - **CLI & Library**: Use as a standalone command-line tool or integrate into your own Rust project.
 
 ## Demo
 
-![World Urban Population Demo](https://raw.githubusercontent.com/northward1/bar-chart-race-rs/main/race_urban.gif)
+![World Urban Population Demo](https://raw.githubusercontent.com/northward1/bar-chart-race-rs/main/race_urban.webp)
 
 ## Installation
 
@@ -42,7 +43,7 @@ bar-chart-race \
 # Example with World Urban Population dataset:
 bar-chart-race \
   --input examples/data/urban_pop.csv \
-  --output race_urban.gif \
+  --output race_urban.webp \
   --title "World Urban Population (1976-2018)" \
   --x-label "Urban Population" \
   --axis-number-format exp \
@@ -56,7 +57,7 @@ bar-chart-race \
 ### Options
 
 - `-i, --input <PATH>`: Input CSV file path (wide-format: 1st column is date/period, rest are categories)
-- `-o, --output <PATH>`: Output GIF file path (default: `output.gif`)
+- `-o, --output <PATH>`: Output file path (.gif, .mp4, .webm, .webp; default: `output.gif`)
 - `-t, --title <STRING>`: Chart title (default: `Bar Chart Race`)
 - `-n, --top-n <NUMBER>`: Number of top bars to display (default: `10`)
 - `--fps <NUMBER>`: Frame rate for the output GIF (default: `30`)
@@ -76,6 +77,12 @@ bar-chart-race \
 - `--axis-number-format <auto|integer|compact|scientific|exp|fixed1|fixed2>`: Override number format specifically for axis ticks
 - `--bar-number-format <auto|integer|compact|scientific|exp|fixed1|fixed2>`: Override number format specifically for bar value labels
 - `--hide-bar-labels`: Hide value/name labels attached to the bars
+- `--no-progress`: Disable the progress bar during GIF rendering
+- `--hide-title`: Hide the chart title and expand chart area upward
+- `--title-size <PIXELS>`: Font size for the chart title (default: `32`)
+- `--bar-label-size <PIXELS>`: Font size for bar labels (names and values, default: `15` for horizontal, `13` for vertical)
+- `--period-label-size <PIXELS>`: Font size for the period / time label in the corner (default: `52`)
+- `--axis-label-size <PIXELS>`: Font size for axis tick numbers and axis descriptions (default: `12`)
 
 ## Sample Datasets
 

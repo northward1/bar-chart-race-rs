@@ -4,7 +4,9 @@ use image::{Delay, Frame as ImgFrame, RgbImage};
 use plotters::prelude::*;
 use plotters::style::text_anchor::{HPos, Pos, VPos};
 use std::fs::File;
+use std::io::Write;
 use std::path::Path;
+use std::process::{Command, Stdio};
 use std::time::Duration;
 
 use crate::config::{ChartConfig, LabelPosition, NumberFormat, Orientation};
@@ -100,18 +102,42 @@ impl Renderer {
         Self { config }
     }
 
-    /// Render frames into an animated GIF using Plotters and the image crate
-    pub fn render_gif<P: AsRef<Path>>(&self, frames: &[Frame], output_path: P) -> Result<()> {
-        let delay_ms = 1000 / self.config.fps.max(1);
-        let file = File::create(output_path)?;
-        let mut encoder = GifEncoder::new(file);
-        encoder.set_repeat(Repeat::Infinite)?;
+    /// Automatically render frames to the format indicated by the output path extension (e.g. .gif, .mp4, .webm, .webp)
+    pub fn render<P: AsRef<Path>>(&self, frames: &[Frame], output_path: P) -> Result<()> {
+        self.render_with_progress(frames, output_path, |_, _| {})
+    }
 
-        let width = self.config.width;
-        let height = self.config.height;
+    /// Automatically render frames with progress reporting based on the file extension
+    pub fn render_with_progress<P, F>(
+        &self,
+        frames: &[Frame],
+        output_path: P,
+        on_progress: F,
+    ) -> Result<()>
+    where
+        P: AsRef<Path>,
+        F: FnMut(usize, usize),
+    {
+        let ext = output_path
+            .as_ref()
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_lowercase();
 
-        let name_font = ("sans-serif", 15).into_font();
-        let (margin_left, y_label_area_size) = match self.config.label_position {
+        if ext == "gif" || ext.is_empty() {
+            self.render_gif_with_progress(frames, output_path, on_progress)
+        } else {
+            self.render_video_via_ffmpeg(frames, output_path, on_progress)
+        }
+    }
+
+    /// Calculate horizontal margins based on category name font bounding boxes
+    fn calculate_margins(&self, frames: &[Frame]) -> (u32, u32) {
+        let bar_label_size = self.config.effective_bar_label_size();
+        let axis_label_size = self.config.effective_axis_label_size();
+        let name_font = ("sans-serif", bar_label_size).into_font();
+        match self.config.label_position {
             LabelPosition::YAxis => {
                 let max_name_width = frames
                     .iter()
@@ -120,48 +146,91 @@ impl Renderer {
                     .map(|b| name_font.box_size(&b.name).map(|(w, _)| w).unwrap_or(0))
                     .max()
                     .unwrap_or(0);
-                let y_desc_space = if self.config.y_label.is_some() { 30 } else { 0 };
-                // Keep 8px padding between the category text and the Y-axis (x=0)
+                let y_desc_space = if self.config.y_label.is_some() {
+                    axis_label_size * 2 + 6
+                } else {
+                    0
+                };
                 let area_size = max_name_width + 8 + y_desc_space;
                 (15, area_size)
             }
             LabelPosition::BarTip => {
                 let area_size = if self.config.y_label.is_some() {
-                    40
+                    axis_label_size * 2 + 16
                 } else {
                     15
                 };
                 (20, area_size)
             }
-        };
+        }
+    }
 
-        for frame in frames {
-            let mut buf = vec![0u8; (width * height * 3) as usize];
+    /// Render a single frame to an RGB24 raw buffer
+    fn render_frame_to_buffer(
+        &self,
+        frame: &Frame,
+        width: u32,
+        height: u32,
+        margin_left: u32,
+        y_label_area_size: u32,
+    ) -> Result<Vec<u8>> {
+        let mut buf = vec![0u8; (width * height * 3) as usize];
+        {
+            let root = BitMapBackend::with_buffer(&mut buf, (width, height)).into_drawing_area();
+            root.fill(&WHITE)?;
 
-            {
-                let root =
-                    BitMapBackend::with_buffer(&mut buf, (width, height)).into_drawing_area();
-                root.fill(&WHITE)?;
+            let max_val = self.config.max_x.unwrap_or(frame.max_value * 1.2).max(1.0);
 
-                let max_val = self.config.max_x.unwrap_or(frame.max_value * 1.2).max(1.0);
-
-                match self.config.orientation {
-                    Orientation::Horizontal => {
-                        self.render_horizontal_frame(
-                            &root,
-                            frame,
-                            max_val,
-                            margin_left,
-                            y_label_area_size,
-                        )?;
-                    }
-                    Orientation::Vertical => {
-                        self.render_vertical_frame(&root, frame, max_val)?;
-                    }
+            match self.config.orientation {
+                Orientation::Horizontal => {
+                    self.render_horizontal_frame(
+                        &root,
+                        frame,
+                        max_val,
+                        margin_left,
+                        y_label_area_size,
+                    )?;
                 }
-
-                root.present()?;
+                Orientation::Vertical => {
+                    self.render_vertical_frame(&root, frame, max_val)?;
+                }
             }
+
+            root.present()?;
+        }
+        Ok(buf)
+    }
+
+    /// Render frames into an animated GIF using Plotters and the image crate
+    pub fn render_gif<P: AsRef<Path>>(&self, frames: &[Frame], output_path: P) -> Result<()> {
+        self.render_gif_with_progress(frames, output_path, |_, _| {})
+    }
+
+    /// Render frames into an animated GIF, calling `on_progress(current_frame, total_frames)` after each frame is processed
+    pub fn render_gif_with_progress<P, F>(
+        &self,
+        frames: &[Frame],
+        output_path: P,
+        mut on_progress: F,
+    ) -> Result<()>
+    where
+        P: AsRef<Path>,
+        F: FnMut(usize, usize),
+    {
+        let delay_ms = 1000 / self.config.fps.max(1);
+        let file = File::create(output_path)?;
+        let mut encoder = GifEncoder::new(file);
+        encoder.set_repeat(Repeat::Infinite)?;
+
+        let width = self.config.width;
+        let height = self.config.height;
+
+        let (margin_left, y_label_area_size) = self.calculate_margins(frames);
+        let total_frames = frames.len();
+
+        for (i, frame) in frames.iter().enumerate() {
+            let buf =
+                self.render_frame_to_buffer(frame, width, height, margin_left, y_label_area_size)?;
 
             let rgb_img = RgbImage::from_raw(width, height, buf)
                 .ok_or_else(|| anyhow::anyhow!("Failed to create RgbImage from buffer"))?;
@@ -174,6 +243,88 @@ impl Renderer {
                 Delay::from_saturating_duration(Duration::from_millis(delay_ms as u64)),
             );
             encoder.encode_frame(img_frame)?;
+            on_progress(i + 1, total_frames);
+        }
+
+        Ok(())
+    }
+
+    /// Render frames into a video/animation format (.mp4, .webm, .webp, etc.) using ffmpeg
+    pub fn render_video_via_ffmpeg<P, F>(
+        &self,
+        frames: &[Frame],
+        output_path: P,
+        mut on_progress: F,
+    ) -> Result<()>
+    where
+        P: AsRef<Path>,
+        F: FnMut(usize, usize),
+    {
+        let ext = output_path
+            .as_ref()
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+
+        let width = self.config.width;
+        let height = self.config.height;
+
+        let mut cmd = Command::new("ffmpeg");
+        cmd.args([
+            "-y",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgb24",
+            "-s",
+            &format!("{}x{}", width, height),
+            "-r",
+            &format!("{}", self.config.fps),
+            "-i",
+            "-",
+            "-loglevel",
+            "error",
+        ]);
+
+        if ext == "mp4" {
+            cmd.args(["-c:v", "libx264", "-pix_fmt", "yuv420p"]);
+        } else if ext == "webp" {
+            cmd.args(["-loop", "0"]);
+        } else if ext == "webm" {
+            cmd.args(["-c:v", "libvpx-vp9", "-pix_fmt", "yuv420p"]);
+        }
+
+        cmd.arg(output_path.as_ref());
+        cmd.stdin(Stdio::piped());
+
+        let mut child = cmd.spawn().map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to execute ffmpeg for {:?}. Ensure ffmpeg is installed and in your PATH: {}",
+                output_path.as_ref(),
+                e
+            )
+        })?;
+
+        let mut stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| anyhow::anyhow!("Failed to open stdin for ffmpeg process"))?;
+
+        let (margin_left, y_label_area_size) = self.calculate_margins(frames);
+        let total_frames = frames.len();
+
+        for (i, frame) in frames.iter().enumerate() {
+            let buf =
+                self.render_frame_to_buffer(frame, width, height, margin_left, y_label_area_size)?;
+            stdin.write_all(&buf)?;
+            on_progress(i + 1, total_frames);
+        }
+
+        drop(stdin);
+        let status = child.wait()?;
+        if !status.success() {
+            anyhow::bail!("ffmpeg failed with status: {}", status);
         }
 
         Ok(())
@@ -189,18 +340,30 @@ impl Renderer {
     ) -> Result<()> {
         let (width, height) = root.dim_in_pixel();
 
+        let bar_label_size = self.config.effective_bar_label_size();
+        let axis_label_size = self.config.effective_axis_label_size();
+        let period_label_size = self.config.effective_period_label_size();
+
         let x_label_area_size = if self.config.x_label.is_some() {
-            40
+            axis_label_size * 2 + 10
         } else {
-            30
+            axis_label_size + 8
         };
 
+        let margin_top = if self.config.is_title_visible() { 6 } else { 8 };
+        let margin_bottom = 8;
+        let margin_right = 15;
+
         let mut builder = ChartBuilder::on(root);
+        if self.config.is_title_visible() {
+            let title_size = self.config.effective_title_size();
+            builder.caption(&self.config.title, ("sans-serif", title_size).into_font());
+        }
         builder
-            .caption(&self.config.title, ("sans-serif", 32).into_font())
-            .margin(25)
-            .margin_top(15)
+            .margin_top(margin_top)
+            .margin_bottom(margin_bottom)
             .margin_left(margin_left)
+            .margin_right(margin_right)
             .x_label_area_size(x_label_area_size)
             .y_label_area_size(y_label_area_size);
 
@@ -208,6 +371,11 @@ impl Renderer {
             ($chart:ident, $base_val:expr) => {{
                 let mut mesh = $chart.configure_mesh();
                 mesh.disable_y_mesh();
+                let axis_font = ("sans-serif", axis_label_size).into_font();
+                mesh.x_label_style(axis_font.clone());
+                mesh.y_label_style(axis_font.clone());
+                mesh.axis_desc_style(axis_font);
+
                 if let Some(ref y_label) = self.config.y_label {
                     mesh.y_desc(y_label);
                 } else {
@@ -228,13 +396,15 @@ impl Renderer {
                 mesh.draw()?;
 
                 // Draw period/time label in bottom-right (clear of x-axis ticks)
-                let period_style = TextStyle::from(("sans-serif", 52).into_font())
+                let period_style = TextStyle::from(("sans-serif", period_label_size).into_font())
                     .color(&BLACK)
                     .pos(Pos::new(HPos::Right, VPos::Bottom));
+                let period_bottom_y =
+                    height as i32 - (margin_bottom + x_label_area_size + 10) as i32;
                 root.draw_text(
                     &frame.period_label,
                     &period_style,
-                    (width as i32 - 50, height as i32 - 60),
+                    (width as i32 - 40, period_bottom_y),
                 )?;
 
                 let (_, top_py) = $chart
@@ -242,12 +412,12 @@ impl Renderer {
                     .map_coordinate(&($base_val, self.config.top_n as f64));
                 let (_, bottom_py) = $chart.plotting_area().map_coordinate(&($base_val, 0.0));
 
-                let y_axis_name_style = TextStyle::from(("sans-serif", 15).into_font())
+                let y_axis_name_style = TextStyle::from(("sans-serif", bar_label_size).into_font())
                     .color(&BLACK)
                     .pos(Pos::new(HPos::Right, VPos::Center));
 
                 // Position value label vertically centered with the bar (VPos::Center)
-                let val_text_style = TextStyle::from(("sans-serif", 15).into_font())
+                let val_text_style = TextStyle::from(("sans-serif", bar_label_size).into_font())
                     .color(&BLACK)
                     .pos(Pos::new(HPos::Left, VPos::Center));
 
@@ -325,22 +495,47 @@ impl Renderer {
     ) -> Result<()> {
         let (width, _) = root.dim_in_pixel();
 
+        let bar_label_size = self.config.effective_bar_label_size();
+        let axis_label_size = self.config.effective_axis_label_size();
+        let period_label_size = self.config.effective_period_label_size();
+
         let y_label_area_size = if self.config.y_label.is_some() {
-            65
+            axis_label_size * 4 + 10
         } else {
-            50
+            axis_label_size * 3 + 8
         };
-        let x_label_area_size = if self.config.x_label.is_some() {
-            60
+        let name_space = match self.config.label_position {
+            LabelPosition::YAxis => bar_label_size + 6,
+            LabelPosition::BarTip => 8,
+        };
+        let x_desc_space = if self.config.x_label.is_some() {
+            axis_label_size + 8
         } else {
-            40
+            0
         };
+        let x_label_area_size = name_space + x_desc_space + 8;
+
+        let margin_bottom = 8;
+        let margin_left = 15;
+        let margin_right = 15;
 
         let mut builder = ChartBuilder::on(root);
+        let (margin_top, period_top_y) = if self.config.is_title_visible() {
+            let title_size = self.config.effective_title_size();
+            builder.caption(&self.config.title, ("sans-serif", title_size).into_font());
+            let m_top = 8;
+            let p_y = (title_size as f32 * 1.1).round() as i32 + 8;
+            (m_top, p_y)
+        } else {
+            let m_top = period_label_size + 10;
+            let p_y = 6;
+            (m_top, p_y)
+        };
         builder
-            .caption(&self.config.title, ("sans-serif", 32).into_font())
-            .margin(25)
-            .margin_top(35)
+            .margin_top(margin_top)
+            .margin_bottom(margin_bottom)
+            .margin_left(margin_left)
+            .margin_right(margin_right)
             .x_label_area_size(x_label_area_size)
             .y_label_area_size(y_label_area_size);
 
@@ -349,6 +544,11 @@ impl Renderer {
                 let mut mesh = $chart.configure_mesh();
                 mesh.disable_x_mesh();
                 mesh.disable_x_axis();
+                let axis_font = ("sans-serif", axis_label_size).into_font();
+                mesh.x_label_style(axis_font.clone());
+                mesh.y_label_style(axis_font.clone());
+                mesh.axis_desc_style(axis_font);
+
                 if !self.config.log_scale {
                     mesh.y_labels(6);
                 }
@@ -369,10 +569,14 @@ impl Renderer {
                 mesh.draw()?;
 
                 // Draw period/time label in top-right for vertical orientation
-                let period_style = TextStyle::from(("sans-serif", 52).into_font())
+                let period_style = TextStyle::from(("sans-serif", period_label_size).into_font())
                     .color(&BLACK)
                     .pos(Pos::new(HPos::Right, VPos::Top));
-                root.draw_text(&frame.period_label, &period_style, (width as i32 - 40, 45))?;
+                root.draw_text(
+                    &frame.period_label,
+                    &period_style,
+                    (width as i32 - 40, period_top_y),
+                )?;
 
                 let (left_px, _) = $chart.plotting_area().map_coordinate(&(0.0, $base_val));
                 let (right_px, _) = $chart
@@ -381,11 +585,11 @@ impl Renderer {
                 let (_, top_py) = $chart.plotting_area().map_coordinate(&(0.0, max_val));
                 let (_, bottom_py) = $chart.plotting_area().map_coordinate(&(0.0, $base_val));
 
-                let name_style = TextStyle::from(("sans-serif", 13).into_font())
+                let name_style = TextStyle::from(("sans-serif", bar_label_size).into_font())
                     .color(&BLACK)
                     .pos(Pos::new(HPos::Center, VPos::Top));
 
-                let val_style = TextStyle::from(("sans-serif", 13).into_font())
+                let val_style = TextStyle::from(("sans-serif", bar_label_size).into_font())
                     .color(&BLACK)
                     .pos(Pos::new(HPos::Center, VPos::Bottom));
 
