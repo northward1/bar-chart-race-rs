@@ -70,6 +70,11 @@ pub struct ChartConfig {
     pub axis_number_format: Option<NumberFormat>,
     pub bar_number_format: Option<NumberFormat>,
     pub hide_bar_labels: bool,
+    pub hide_title: bool,
+    pub title_size: Option<u32>,
+    pub bar_label_size: Option<u32>,
+    pub period_label_size: Option<u32>,
+    pub axis_label_size: Option<u32>,
 }
 
 impl ChartConfig {
@@ -79,6 +84,29 @@ impl ChartConfig {
 
     pub fn effective_bar_format(&self) -> NumberFormat {
         self.bar_number_format.unwrap_or(self.number_format)
+    }
+
+    pub fn is_title_visible(&self) -> bool {
+        !self.hide_title && !self.title.trim().is_empty()
+    }
+
+    pub fn effective_title_size(&self) -> u32 {
+        self.title_size.unwrap_or(32)
+    }
+
+    pub fn effective_bar_label_size(&self) -> u32 {
+        self.bar_label_size.unwrap_or(match self.orientation {
+            Orientation::Horizontal => 15,
+            Orientation::Vertical => 13,
+        })
+    }
+
+    pub fn effective_period_label_size(&self) -> u32 {
+        self.period_label_size.unwrap_or(52)
+    }
+
+    pub fn effective_axis_label_size(&self) -> u32 {
+        self.axis_label_size.unwrap_or(12)
     }
 }
 
@@ -104,6 +132,11 @@ impl Default for ChartConfig {
             axis_number_format: None,
             bar_number_format: None,
             hide_bar_labels: false,
+            hide_title: false,
+            title_size: None,
+            bar_label_size: None,
+            period_label_size: None,
+            axis_label_size: None,
         }
     }
 }

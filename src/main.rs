@@ -96,6 +96,26 @@ struct Args {
     /// Disable the progress bar during GIF rendering
     #[arg(long)]
     no_progress: bool,
+
+    /// Hide the chart title
+    #[arg(long)]
+    hide_title: bool,
+
+    /// Font size for the chart title (default: 32)
+    #[arg(long)]
+    title_size: Option<u32>,
+
+    /// Font size for bar labels (names and values, default: 15 for horizontal, 13 for vertical)
+    #[arg(long)]
+    bar_label_size: Option<u32>,
+
+    /// Font size for the period / time label in the corner (default: 52)
+    #[arg(long)]
+    period_label_size: Option<u32>,
+
+    /// Font size for axis tick numbers and axis descriptions (default: 12)
+    #[arg(long)]
+    axis_label_size: Option<u32>,
 }
 
 fn main() -> Result<()> {
@@ -136,6 +156,11 @@ fn main() -> Result<()> {
         axis_number_format: args.axis_number_format,
         bar_number_format: args.bar_number_format,
         hide_bar_labels: args.hide_bar_labels,
+        hide_title: args.hide_title,
+        title_size: args.title_size,
+        bar_label_size: args.bar_label_size,
+        period_label_size: args.period_label_size,
+        axis_label_size: args.axis_label_size,
     };
 
     println!(

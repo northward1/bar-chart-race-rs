@@ -322,3 +322,64 @@ fn test_render_gif_with_progress() {
         assert_eq!(total, frames.len());
     }
 }
+
+#[test]
+fn test_hide_title_and_font_sizes() {
+    let data =
+        TimeSeriesData::from_csv("examples/data/cities.csv").expect("CSV loading should succeed");
+
+    // Test horizontal with hidden title and custom font sizes
+    let config_h = ChartConfig {
+        width: 400,
+        height: 300,
+        fps: 10,
+        steps_per_period: 1,
+        top_n: 3,
+        title: "Hidden Title".to_string(),
+        hide_title: true,
+        title_size: Some(24),
+        bar_label_size: Some(10),
+        period_label_size: Some(30),
+        axis_label_size: Some(10),
+        x_label: Some("X Axis".to_string()),
+        y_label: Some("Y Axis".to_string()),
+        ..Default::default()
+    };
+    assert!(!config_h.is_title_visible());
+    assert_eq!(config_h.effective_title_size(), 24);
+    assert_eq!(config_h.effective_bar_label_size(), 10);
+    assert_eq!(config_h.effective_period_label_size(), 30);
+    assert_eq!(config_h.effective_axis_label_size(), 10);
+
+    let frames_h = Interpolator::generate_frames_from_config(&data, &config_h);
+    let tmp_file_h = NamedTempFile::new().expect("Create temp file");
+    let renderer_h = Renderer::new(config_h);
+    renderer_h
+        .render_gif(&frames_h, tmp_file_h.path())
+        .expect("Horizontal rendering with hidden title should succeed");
+    assert!(std::fs::metadata(tmp_file_h.path()).unwrap().len() > 0);
+
+    // Test vertical with empty title (should also treat as hidden) and custom font sizes
+    let config_v = ChartConfig {
+        width: 400,
+        height: 300,
+        fps: 10,
+        steps_per_period: 1,
+        top_n: 3,
+        title: "   ".to_string(), // whitespace-only title
+        orientation: bar_chart_race::Orientation::Vertical,
+        bar_label_size: Some(11),
+        period_label_size: Some(36),
+        axis_label_size: Some(9),
+        ..Default::default()
+    };
+    assert!(!config_v.is_title_visible());
+
+    let frames_v = Interpolator::generate_frames_from_config(&data, &config_v);
+    let tmp_file_v = NamedTempFile::new().expect("Create temp file");
+    let renderer_v = Renderer::new(config_v);
+    renderer_v
+        .render_gif(&frames_v, tmp_file_v.path())
+        .expect("Vertical rendering with empty title should succeed");
+    assert!(std::fs::metadata(tmp_file_v.path()).unwrap().len() > 0);
+}

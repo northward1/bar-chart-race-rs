@@ -124,7 +124,9 @@ impl Renderer {
         let width = self.config.width;
         let height = self.config.height;
 
-        let name_font = ("sans-serif", 15).into_font();
+        let bar_label_size = self.config.effective_bar_label_size();
+        let axis_label_size = self.config.effective_axis_label_size();
+        let name_font = ("sans-serif", bar_label_size).into_font();
         let (margin_left, y_label_area_size) = match self.config.label_position {
             LabelPosition::YAxis => {
                 let max_name_width = frames
@@ -134,14 +136,18 @@ impl Renderer {
                     .map(|b| name_font.box_size(&b.name).map(|(w, _)| w).unwrap_or(0))
                     .max()
                     .unwrap_or(0);
-                let y_desc_space = if self.config.y_label.is_some() { 30 } else { 0 };
+                let y_desc_space = if self.config.y_label.is_some() {
+                    axis_label_size * 2 + 6
+                } else {
+                    0
+                };
                 // Keep 8px padding between the category text and the Y-axis (x=0)
                 let area_size = max_name_width + 8 + y_desc_space;
                 (15, area_size)
             }
             LabelPosition::BarTip => {
                 let area_size = if self.config.y_label.is_some() {
-                    40
+                    axis_label_size * 2 + 16
                 } else {
                     15
                 };
@@ -205,17 +211,27 @@ impl Renderer {
     ) -> Result<()> {
         let (width, height) = root.dim_in_pixel();
 
+        let bar_label_size = self.config.effective_bar_label_size();
+        let axis_label_size = self.config.effective_axis_label_size();
+        let period_label_size = self.config.effective_period_label_size();
+
         let x_label_area_size = if self.config.x_label.is_some() {
-            40
+            axis_label_size * 2 + 16
         } else {
-            30
+            axis_label_size + 18
         };
 
         let mut builder = ChartBuilder::on(root);
+        if self.config.is_title_visible() {
+            let title_size = self.config.effective_title_size();
+            builder.caption(&self.config.title, ("sans-serif", title_size).into_font());
+            let margin_top = (title_size as f32 * 0.45).round() as u32;
+            builder.margin_top(margin_top.max(10));
+        } else {
+            builder.margin_top(15);
+        }
         builder
-            .caption(&self.config.title, ("sans-serif", 32).into_font())
             .margin(25)
-            .margin_top(15)
             .margin_left(margin_left)
             .x_label_area_size(x_label_area_size)
             .y_label_area_size(y_label_area_size);
@@ -224,6 +240,11 @@ impl Renderer {
             ($chart:ident, $base_val:expr) => {{
                 let mut mesh = $chart.configure_mesh();
                 mesh.disable_y_mesh();
+                let axis_font = ("sans-serif", axis_label_size).into_font();
+                mesh.x_label_style(axis_font.clone());
+                mesh.y_label_style(axis_font.clone());
+                mesh.axis_desc_style(axis_font);
+
                 if let Some(ref y_label) = self.config.y_label {
                     mesh.y_desc(y_label);
                 } else {
@@ -244,7 +265,7 @@ impl Renderer {
                 mesh.draw()?;
 
                 // Draw period/time label in bottom-right (clear of x-axis ticks)
-                let period_style = TextStyle::from(("sans-serif", 52).into_font())
+                let period_style = TextStyle::from(("sans-serif", period_label_size).into_font())
                     .color(&BLACK)
                     .pos(Pos::new(HPos::Right, VPos::Bottom));
                 root.draw_text(
@@ -258,12 +279,12 @@ impl Renderer {
                     .map_coordinate(&($base_val, self.config.top_n as f64));
                 let (_, bottom_py) = $chart.plotting_area().map_coordinate(&($base_val, 0.0));
 
-                let y_axis_name_style = TextStyle::from(("sans-serif", 15).into_font())
+                let y_axis_name_style = TextStyle::from(("sans-serif", bar_label_size).into_font())
                     .color(&BLACK)
                     .pos(Pos::new(HPos::Right, VPos::Center));
 
                 // Position value label vertically centered with the bar (VPos::Center)
-                let val_text_style = TextStyle::from(("sans-serif", 15).into_font())
+                let val_text_style = TextStyle::from(("sans-serif", bar_label_size).into_font())
                     .color(&BLACK)
                     .pos(Pos::new(HPos::Left, VPos::Center));
 
@@ -341,22 +362,39 @@ impl Renderer {
     ) -> Result<()> {
         let (width, _) = root.dim_in_pixel();
 
+        let bar_label_size = self.config.effective_bar_label_size();
+        let axis_label_size = self.config.effective_axis_label_size();
+        let period_label_size = self.config.effective_period_label_size();
+
         let y_label_area_size = if self.config.y_label.is_some() {
-            65
+            axis_label_size * 4 + 17
         } else {
-            50
+            axis_label_size * 3 + 14
         };
-        let x_label_area_size = if self.config.x_label.is_some() {
-            60
+        let name_space = match self.config.label_position {
+            LabelPosition::YAxis => bar_label_size + 8,
+            LabelPosition::BarTip => 10,
+        };
+        let x_desc_space = if self.config.x_label.is_some() {
+            axis_label_size + 14
         } else {
-            40
+            0
         };
+        let x_label_area_size = name_space + x_desc_space + 15;
 
         let mut builder = ChartBuilder::on(root);
+        let period_top_y = if self.config.is_title_visible() {
+            let title_size = self.config.effective_title_size();
+            builder.caption(&self.config.title, ("sans-serif", title_size).into_font());
+            let margin_top = (title_size as f32 * 0.9).round() as u32 + 5;
+            builder.margin_top(margin_top.max(25));
+            (title_size as f32 * 1.1).round() as i32 + 10
+        } else {
+            builder.margin_top(period_label_size + 15);
+            15
+        };
         builder
-            .caption(&self.config.title, ("sans-serif", 32).into_font())
             .margin(25)
-            .margin_top(35)
             .x_label_area_size(x_label_area_size)
             .y_label_area_size(y_label_area_size);
 
@@ -365,6 +403,11 @@ impl Renderer {
                 let mut mesh = $chart.configure_mesh();
                 mesh.disable_x_mesh();
                 mesh.disable_x_axis();
+                let axis_font = ("sans-serif", axis_label_size).into_font();
+                mesh.x_label_style(axis_font.clone());
+                mesh.y_label_style(axis_font.clone());
+                mesh.axis_desc_style(axis_font);
+
                 if !self.config.log_scale {
                     mesh.y_labels(6);
                 }
@@ -385,10 +428,14 @@ impl Renderer {
                 mesh.draw()?;
 
                 // Draw period/time label in top-right for vertical orientation
-                let period_style = TextStyle::from(("sans-serif", 52).into_font())
+                let period_style = TextStyle::from(("sans-serif", period_label_size).into_font())
                     .color(&BLACK)
                     .pos(Pos::new(HPos::Right, VPos::Top));
-                root.draw_text(&frame.period_label, &period_style, (width as i32 - 40, 45))?;
+                root.draw_text(
+                    &frame.period_label,
+                    &period_style,
+                    (width as i32 - 40, period_top_y),
+                )?;
 
                 let (left_px, _) = $chart.plotting_area().map_coordinate(&(0.0, $base_val));
                 let (right_px, _) = $chart
@@ -397,11 +444,11 @@ impl Renderer {
                 let (_, top_py) = $chart.plotting_area().map_coordinate(&(0.0, max_val));
                 let (_, bottom_py) = $chart.plotting_area().map_coordinate(&(0.0, $base_val));
 
-                let name_style = TextStyle::from(("sans-serif", 13).into_font())
+                let name_style = TextStyle::from(("sans-serif", bar_label_size).into_font())
                     .color(&BLACK)
                     .pos(Pos::new(HPos::Center, VPos::Top));
 
-                let val_style = TextStyle::from(("sans-serif", 13).into_font())
+                let val_style = TextStyle::from(("sans-serif", bar_label_size).into_font())
                     .color(&BLACK)
                     .pos(Pos::new(HPos::Center, VPos::Bottom));
 

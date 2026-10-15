@@ -77,6 +77,11 @@ bar-chart-race \
 - `--bar-number-format <auto|integer|compact|scientific|exp|fixed1|fixed2>`: Override number format specifically for bar value labels
 - `--hide-bar-labels`: Hide value/name labels attached to the bars
 - `--no-progress`: Disable the progress bar during GIF rendering
+- `--hide-title`: Hide the chart title and expand chart area upward
+- `--title-size <PIXELS>`: Font size for the chart title (default: `32`)
+- `--bar-label-size <PIXELS>`: Font size for bar labels (names and values, default: `15` for horizontal, `13` for vertical)
+- `--period-label-size <PIXELS>`: Font size for the period / time label in the corner (default: `52`)
+- `--axis-label-size <PIXELS>`: Font size for axis tick numbers and axis descriptions (default: `12`)
 
 ## Sample Datasets
 
